@@ -1,0 +1,25 @@
+name: Gemini AI PR Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize] # Action ini jalan pas PR baru dibuka atau di-update
+
+permissions:
+  contents: read
+  pull-requests: write # Penting biar bot bisa nulis komen di PR
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Wajib biar AI bisa membandingkan kode lama dan baru
+          
+      - name: Run Gemini AI Review
+        # Ini pakai script open-source siap pakai dari marketplace GitHub
+        uses: josenerydev/gemini-pr-reviewer@v1.0.0 
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Token bawaan GitHub (gak perlu dibikin)
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # API Key yang lu simpan di Step 1
