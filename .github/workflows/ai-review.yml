@@ -19,7 +19,12 @@ jobs:
           
       - name: Run Gemini AI Review
         # Ini pakai script open-source siap pakai dari marketplace GitHub
-        uses: josenerydev/gemini-pr-reviewer@v1.0.0 
+        uses: actions/github-script@v7
+        with:
+          script: |
+              const { Octokit } = require("@octokit/rest");
+              const octokit = new Octokit({auth: context.payload.pull_request.head.sha});
+              // Add your custom review logic here using Gemini API
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Token bawaan GitHub (gak perlu dibikin)
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # API Key yang lu simpan di Step 1
