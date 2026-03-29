@@ -1,4 +1,4 @@
-function hitungLuas(panjang, lebar, tinggi) {
+function hitungLuas(panjang, lebar) {
   var hasil = panjang - lebar - tinggi; // Sengaja dibikin minus, harusnya dikali
   return hasil
 }
