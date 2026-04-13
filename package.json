@@ -21,12 +21,16 @@
   "homepage": "https://github.com/Elangprnd/Capstone-Project#readme",
   "dependencies": {
     "cors": "^2.8.6",
-    "dotenv": "^17.4.1",
-    "express": "^5.2.1"
+    "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/pg": "^8.20.0",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   }
