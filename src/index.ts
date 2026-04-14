@@ -13,8 +13,8 @@ async function testConnection() {
     const db = drizzle(pool);
 
    
-    const result3 = await db.execute(sql`SELECT COUNT(*) as count FROM users;`);
-    console.log(" Users table row count: ", result3.rows[0].count);
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM users;`);
+    console.log(" Users table row count: ", result.rows[0].count);
 
     await pool.end();
     return true;
