@@ -1,14 +1,34 @@
 import express, { Router } from "express";
+import jwt from "jsonwebtoken";
+
 const router: Router = express.Router();
 
+// REGISTER (tetap ada + tambah data)
 router.post("/register", (req, res) => {
-  res.status(200).json({ message: "register endpoint" });
+  res.status(200).json({
+    message: "register endpoint",
+    data: req.body,
+  });
 });
 
+// LOGIN (upgrade dari dummy → JWT)
 router.post("/login", (req, res) => {
-  res.status(200).json({ message: "login endpoint" });
+  const payload = {
+    userId: 1,
+    email: "dummy@email.com",
+  };
+
+  const token = jwt.sign(payload, process.env.JWT_SECRET as string, {
+    expiresIn: "1h",
+  });
+
+  res.status(200).json({
+    message: "login success",
+    token,
+  });
 });
 
+// sisanya tetap (punya temen kamu)
 router.post("/google", (req, res) => {
   res.status(200).json({ message: "google oauth endpoint" });
 });
