@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
@@ -24,14 +22,12 @@ export const authMiddleware = (
       process.env.JWT_SECRET as string
     );
 
-    // simpan user ke request
     (req as any).user = decoded;
 
     next();
-  } catch (error) {
+  } catch {
     return res.status(401).json({
       message: "Unauthorized - Token invalid",
     });
   }
 };
->>>>>>> 6aa995b (feat: setup apply mission endpoint with auth middleware (dummy response))

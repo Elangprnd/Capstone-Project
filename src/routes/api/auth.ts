@@ -1,40 +1,26 @@
 import express, { Router } from "express";
+import jwt from "jsonwebtoken";
+
 const router: Router = express.Router();
 
-<<<<<<< HEAD
+// REGISTER (tetap ada + tambah data)
 router.post("/register", (req, res) => {
-  res.status(200).json({ message: "register endpoint" });
-});
-
-router.post("/login", (req, res) => {
-  res.status(200).json({ message: "login endpoint" });
-});
-
-=======
-// REGISTER
-router.post("/register", (req, res) => {
-  const { email, password } = req.body;
-
   res.status(200).json({
     message: "register endpoint",
-    data: { email, password },
+    data: req.body,
   });
 });
 
-// LOGIN
+// LOGIN (upgrade dari dummy → JWT)
 router.post("/login", (req, res) => {
   const payload = {
     userId: 1,
     email: "dummy@email.com",
   };
 
-  const token = jwt.sign(
-    payload,
-    process.env.JWT_SECRET as string,
-    {
-      expiresIn: "1h",
-    }
-  );
+  const token = jwt.sign(payload, process.env.JWT_SECRET as string, {
+    expiresIn: "1h",
+  });
 
   res.status(200).json({
     message: "login success",
@@ -42,8 +28,7 @@ router.post("/login", (req, res) => {
   });
 });
 
-// sisanya tetap
->>>>>>> 6aa995b (feat: setup apply mission endpoint with auth middleware (dummy response))
+// sisanya tetap (punya temen kamu)
 router.post("/google", (req, res) => {
   res.status(200).json({ message: "google oauth endpoint" });
 });
