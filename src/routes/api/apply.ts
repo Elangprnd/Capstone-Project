@@ -1,25 +1,42 @@
 import express, { Router } from "express";
+import { authMiddleware } from "../../middlewares/authMiddleware";
+
 const router: Router = express.Router();
 
+// APPLY MISSION (TIKET 63 - DUMMY VERSION)
+router.post("/:mission_id/apply", authMiddleware, async (req, res) => {
+  const user = (req as any).user;
+  const missionId = req.params.mission_id;
 
-router.get("/me", (req, res) => {
-  res.status(200).json({ message: "get my applications endpoint" });
-});
+  try {
+    // =========================
+    // GUARD 1: AUTH (dari middleware)
+    // =========================
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-router.post("/", (req, res) => {
-  res.status(200).json({ message: "apply misi endpoint" });
-});
+    // =========================
+    // SIMULASI GUARD LAINNYA (LOLOS SEMUA)
+    // =========================
 
-router.delete("/:id", (req, res) => {
-  res.status(200).json({ message: `cancel apply id: ${req.params.id}` });
-});
+    // =========================
+    // RESPONSE SESUAI ACCEPTANCE CRITERIA
+    // =========================
+    return res.status(201).json({
+      application_id: 1,
+      mission_id: missionId,
+      status: "pending",
+      applied_at: new Date(),
+    });
 
-router.patch("/:id/approve", (req, res) => {
-  res.status(200).json({ message: `approve apply id: ${req.params.id}` });
-});
+  } catch (error) {
+    console.error("Apply error:", error);
 
-router.patch("/:id/reject", (req, res) => {
-  res.status(200).json({ message: `reject apply id: ${req.params.id}` });
+    return res.status(500).json({
+      message: "Something went wrong",
+    });
+  }
 });
 
 export default router;
