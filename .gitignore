@@ -18,3 +18,7 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# buat key pair token
+public.key
+private.key

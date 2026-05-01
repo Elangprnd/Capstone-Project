@@ -27,3 +27,4 @@ export const verifyToken = (token: string): JwtPayload => {
     algorithms: ['RS256'],
   }) as JwtPayload
 }
+
