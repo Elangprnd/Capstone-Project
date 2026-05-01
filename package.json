@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/Elangprnd/Capstone-Project#readme",
   "dependencies": {
+    "axios": "^1.15.2",
     "cors": "^2.8.6",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",

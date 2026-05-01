@@ -1,57 +1,56 @@
-import express, { Router } from "express";
+import express, { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { db } from "../../db/index.js";
+import { usersTable } from "../../db/schema.js";
+import { eq } from "drizzle-orm";
+
 const router: Router = express.Router();
 
-// REGISTER
-router.post("/register", (req, res) => {
+// LOGIN
+router.post("/login", async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
-  res.status(200).json({
-    message: "register endpoint",
-    data: { email, password },
-  });
-});
+  try {
+    // 1. Cari user di database berdasarkan email
+    const [user] = await db.select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email));
 
-// LOGIN
-router.post("/login", (req, res) => {
-  const payload = {
-  userId: 1,
-  email: "dummy@email.com",
-  role: "volunteer", 
-  };
-
-  const token = jwt.sign(
-    payload,
-    process.env.JWT_SECRET as string,
-    {
-      expiresIn: "1h",
+    // 2. Jika user tidak ditemukan
+    if (!user) {
+      return res.status(401).json({ message: "Email tidak terdaftar" });
     }
-  );
 
-  res.status(200).json({
-    message: "login success",
-    token,
-  });
+    // 3. Bandingkan password (karena di Drizzle tadi kita isi plain text, kita bandingkan langsung)
+    // Catatan: Di project asli nanti, baiknya pakai bcrypt.compare()
+    if (user.password !== password) {
+      return res.status(401).json({ message: "Password salah!" });
+    }
+
+    // 4. Jika email & password benar, buat payload dari data asli database
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role, // Ini penting agar authorizeRole("pelapor") di misi.ts jalan
+    };
+
+    const token = jwt.sign(
+      payload,
+      process.env.JWT_SECRET as string,
+      { expiresIn: "1h" }
+    );
+
+    return res.status(200).json({
+      message: "login success",
+      token,
+    });
+
+  } catch (error) {
+    console.error("Login Error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 });
 
-router.post("/google", (req, res) => {
-  res.status(200).json({ message: "google oauth endpoint" });
-});
-
-router.post("/refresh", (req, res) => {
-  res.status(200).json({ message: "refresh token endpoint" });
-});
-
-router.post("/logout", (req, res) => {
-  res.status(200).json({ message: "logout endpoint" });
-});
-
-router.post("/forgot-password", (req, res) => {
-  res.status(200).json({ message: "forgot password endpoint" });
-});
-
-router.post("/reset-password", (req, res) => {
-  res.status(200).json({ message: "reset password endpoint" });
-});
+// ... endpoint lainnya (register, logout, dll)
 
 export default router;
