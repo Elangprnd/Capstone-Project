@@ -1,7 +1,7 @@
 import express, { Router, Request, Response } from "express";
-import { authMiddleware, authorizeRole } from "../../middlewares/authMiddleware.js";
-import { db } from "../../db/index.js"; 
-import { missions, applications } from "../../db/schema.js"; 
+import { authenticate, authorize } from "../../middlewares/authMiddleware";
+import { db } from "../../config/db"; 
+import { missions, applications } from "../../db/schemas"; 
 import { eq, and } from "drizzle-orm";
 
 const router: Router = express.Router();
@@ -10,8 +10,17 @@ const router: Router = express.Router();
  * Endpoint untuk mendapatkan riwayat pendaftaran relawan.
  * Mengimplementasikan isolasi data agar relawan hanya bisa melihat aplikasi miliknya sendiri.
  */
-router.get("/me/status", authMiddleware, authorizeRole("volunteer"), async (req: Request, res: Response) => {
-  const userId = (req as any).user?.id;
+router.get("/me/status", authenticate, authorize("volunteer"), async (req: Request, res: Response) => {
+  const userId = req.user?.user_id;
+
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const volunteerId = Number(userId);
+  if (Number.isNaN(volunteerId)) {
+    return res.status(400).json({ message: "Invalid user identifier" });
+  }
 
   try {
     // Menggunakan LEFT JOIN agar data pendaftaran tetap aman meskipun misi terkait dihapus
@@ -26,7 +35,7 @@ router.get("/me/status", authMiddleware, authorizeRole("volunteer"), async (req:
     })
     .from(applications)
     .leftJoin(missions, eq(applications.missionId, missions.id))
-    .where(eq(applications.volunteerId, userId));
+    .where(eq(applications.volunteerId, volunteerId));
 
     const formattedData = userApplications.map((app) => ({
       application_id: app.application_id,
@@ -56,12 +65,12 @@ router.get("/me/status", authMiddleware, authorizeRole("volunteer"), async (req:
  * Mencakup validasi keberadaan misi, status pendaftaran, kuota, dan pencegahan duplikasi.
  */
 router.post("/:mission_id/apply", 
-  authMiddleware, 
-  authorizeRole("volunteer"), 
+  authenticate, 
+  authorize("volunteer"), 
   async (req: Request<{ mission_id: string }>, res: Response) => {
     const { mission_id } = req.params;
     const missionId = parseInt(mission_id);
-    const userId = (req as any).user?.id;
+    const userId = req.user?.user_id;
 
     try {
       // Validasi: Apakah misi eksis di database?
@@ -104,7 +113,7 @@ router.post("/:mission_id/apply",
         .from(applications)
         .where(
           and(
-            eq(applications.volunteerId, userId),
+            eq(applications.volunteerId, userId as any),
             eq(applications.missionId, missionId)
           )
         )
