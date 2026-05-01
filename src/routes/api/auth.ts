@@ -1,57 +1,17 @@
-import express, { Router } from "express";
-import jwt from "jsonwebtoken";
-const router: Router = express.Router();
+import { Router } from 'express'
+import * as authController from '../../controller/auth.controller'
+import { loginRateLimiter } from '../../middlewares/rateLimiter'
 
-// REGISTER
-router.post("/register", (req, res) => {
-  const { email, password } = req.body;
+const router = Router()
 
-  res.status(200).json({
-    message: "register endpoint",
-    data: { email, password },
-  });
-});
 
-// LOGIN
-router.post("/login", (req, res) => {
-  const payload = {
-  userId: 1,
-  email: "dummy@email.com",
-  role: "volunteer", 
-  };
+// Sudah pakai controller
+router.post('/register/volunteer', authController.registerVolunteerHandler)
+router.post('/register/lembaga', authController.registerLembagaHandler)
+router.post('/login', loginRateLimiter, authController.loginHandler)
+router.post('/logout', authController.logoutHandler)
+router.post('/google', authController.googleAuthHandler)
+router.post('/forgot-password', authController.forgotPasswordHandler)
+router.post('/reset-password', authController.resetPasswordHandler)
 
-  const token = jwt.sign(
-    payload,
-    process.env.JWT_SECRET as string,
-    {
-      expiresIn: "1h",
-    }
-  );
-
-  res.status(200).json({
-    message: "login success",
-    token,
-  });
-});
-
-router.post("/google", (req, res) => {
-  res.status(200).json({ message: "google oauth endpoint" });
-});
-
-router.post("/refresh", (req, res) => {
-  res.status(200).json({ message: "refresh token endpoint" });
-});
-
-router.post("/logout", (req, res) => {
-  res.status(200).json({ message: "logout endpoint" });
-});
-
-router.post("/forgot-password", (req, res) => {
-  res.status(200).json({ message: "forgot password endpoint" });
-});
-
-router.post("/reset-password", (req, res) => {
-  res.status(200).json({ message: "reset password endpoint" });
-});
-
-export default router;
+export default router

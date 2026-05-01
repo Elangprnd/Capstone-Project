@@ -237,3 +237,63 @@ export const googleAuthHandler = async (req: Request, res: Response): Promise<vo
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server.' })
   }
 }
+
+
+// CAP-61: FORGOT PASSWORD
+export const forgotPasswordHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body
+    await authService.forgotPassword(email)
+
+    // Selalu return 200 dengan pesan yang sama
+    res.status(200).json({
+      success: true,
+      message: 'Jika email terdaftar, link reset telah dikirim.',
+    })
+  } catch (error) {
+    // Tetap return 200 agar attacker tidak tahu email mana yang valid
+    res.status(200).json({
+      success: true,
+      message: 'Jika email terdaftar, link reset telah dikirim.',
+    })
+  }
+}
+
+
+// CAP-61: RESET PASSWORD
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token wajib diisi'),
+  new_password: z
+    .string()
+    .min(8, 'Password minimal 8 karakter')
+    .regex(/[A-Z]/, 'Password harus mengandung minimal 1 huruf besar')
+    .regex(/[0-9]/, 'Password harus mengandung minimal 1 angka'),
+})
+
+export const resetPasswordHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const parsed = resetPasswordSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({
+        success: false,
+        message: 'Validasi gagal',
+        errors: parsed.error.flatten().fieldErrors,
+      })
+      return
+    }
+
+    await authService.resetPassword(parsed.data)
+
+    res.status(200).json({
+      success: true,
+      message: 'Password berhasil direset. Silakan login kembali.',
+    })
+
+  } catch (error: any) {
+    if (error.status) {
+      res.status(error.status).json({ success: false, message: error.message })
+      return
+    }
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan server.' })
+  }
+}
