@@ -1,4 +1,6 @@
-import { integer, pgTable, varchar } from "drizzle-orm/pg-core";
+import { integer, pgTable, varchar, text, timestamp, unique, pgEnum } from "drizzle-orm/pg-core";
+
+export const applyStatusEnum = pgEnum("apply_status", ["pending", "approved", "rejected"]);
 
 export const usersTable = pgTable("users", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -6,3 +8,23 @@ export const usersTable = pgTable("users", {
   age: integer().notNull(),
   email: varchar({ length: 255 }).notNull().unique(),
 });
+
+export const missions = pgTable("missions", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  title: varchar({ length: 255 }).notNull(),
+  description: text().notNull(),
+  status: varchar({ length: 50 }).notNull().default("menunggu_relawan"),
+  volunteersNeeded: integer("volunteers_needed").notNull().default(0),
+  volunteersApplied: integer("volunteers_applied").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const applications = pgTable("applications", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  volunteerId: integer("volunteer_id").notNull(),
+  missionId: integer("mission_id").notNull(),
+  status: applyStatusEnum("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  unq: unique().on(t.volunteerId, t.missionId),
+}));
