@@ -1,33 +1,52 @@
-import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import { Request, Response, NextFunction } from 'express'
+import { verifyToken, JwtPayload } from '../config/jwt'
 
-export const authMiddleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({
-      message: "Unauthorized - Token missing",
-    });
+// Extend Request supaya bisa simpan data user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: JwtPayload
+    }
   }
+}
 
-  const token = authHeader.split(" ")[1];
-
+export const authenticate = (req: Request, res: Response, next: NextFunction): void => {
   try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string
-    );
+    
+    // Ambil token dari cookie
+    const token = req.cookies?.access_token
 
-    (req as any).user = decoded;
+    if (!token) {
+      res.status(401).json({ 
+        success: false, 
+        message: 'Akses ditolak. Silakan login terlebih dahulu.' 
+      })
+      return
+    }
 
-    next();
-  } catch {
-    return res.status(401).json({
-      message: "Unauthorized - Token invalid",
-    });
+    // Verifikasi token
+    const decoded = verifyToken(token)
+    req.user = decoded
+    next()
+
+  } catch (error) {
+    res.status(401).json({ 
+      success: false, 
+      message: 'Token tidak valid atau sudah expired.' 
+    })
   }
-};
+}
+
+// cek role
+export const authorize = (...roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      res.status(403).json({ 
+        success: false, 
+        message: 'Anda tidak memiliki akses ke resource ini.' 
+      })
+      return
+    }
+    next()
+  }
+}
