@@ -3,7 +3,7 @@ import { integer, pgTable, varchar, text, timestamp, unique, pgEnum } from "driz
 
 // TABEL MISI
 export const missions = pgTable("missions", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   title: varchar({ length: 255 }).notNull(),
   description: text().notNull(),
   location: varchar({ length: 255 }).notNull().default("Remote"), 

@@ -6,6 +6,8 @@ import bcrypt from 'bcrypt'
 import { signToken } from '../config/jwt'
 import crypto from 'crypto'
 import { OAuth2Client } from 'google-auth-library'
+import nodemailer from 'nodemailer'
+
 
 const BCRYPT_COST = 10                  // ini buat hash pasword
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)         // ini buat auth google
@@ -206,4 +208,104 @@ export const googleAuth = async (idToken: string) => {
   })
 
   return { token, user: newUser, isNewUser: true }
+}
+
+
+// CAP-61: FORGOT PASSWORD
+export const forgotPassword = async (email: string) => {
+  // Respon SELALU sama, tidak peduli email ada atau tidak
+  // Ini untuk mencegah attacker mengetahui email mana yang terdaftar
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, email),
+  })
+
+  // Jika email tidak ditemukan, tetap return success (jangan bocorkan info)
+  if (!user) return
+
+  // Jika akun Google, jangan kirim email reset
+  if (user.authProvider === 'google') return
+
+  // Generate token yang cryptographically secure
+  const rawToken = crypto.randomBytes(32).toString('hex')
+  
+  // Simpan hash-nya di DB, bukan raw token-nya
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 jam
+
+  await db.insert(passwordResetTokens).values({
+    userId: user.id,
+    tokenHash,
+    expiresAt,
+  })
+
+  // Kirim email dengan link reset
+  const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${rawToken}`
+  await sendResetEmail(user.email, resetLink)
+}
+
+// Helper: kirim email
+const sendResetEmail = async (to: string, resetLink: string) => {
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT),
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  })
+
+  await transporter.sendMail({
+    from: `"VOLETRA" <${process.env.SMTP_USER}>`,
+    to,
+    subject: 'Reset Password VOLETRA',
+    html: `
+      <h2>Reset Password</h2>
+      <p>Klik link berikut untuk mereset password kamu (berlaku 1 jam):</p>
+      <a href="${resetLink}">${resetLink}</a>
+      <p>Jika kamu tidak meminta ini, abaikan email ini.</p>
+    `,
+  })
+}
+
+
+// CAP-61: RESET PASSWORD
+export const resetPassword = async (data: { token: string; new_password: string }) => {
+  // 1. Hash token yang masuk untuk dicocokkan dengan DB
+  const tokenHash = crypto.createHash('sha256').update(data.token).digest('hex')
+
+  // 2. Cari token di DB
+  const resetToken = await db.query.passwordResetTokens.findFirst({
+    where: eq(passwordResetTokens.tokenHash, tokenHash),
+  })
+
+  // 3. Validasi token
+  if (!resetToken) {
+    throw { status: 410, message: 'Link reset sudah tidak valid atau sudah digunakan.' }
+  }
+
+  // 4. Cek apakah sudah kedaluwarsa
+  if (new Date() > resetToken.expiresAt) {
+    throw { status: 410, message: 'Link reset sudah kedaluwarsa.' }
+  }
+
+  // 5. Cek apakah sudah digunakan
+  if (resetToken.usedAt) {
+    throw { status: 410, message: 'Link reset sudah pernah digunakan.' }
+  }
+
+  // 6. Update password dan tandai token sebagai sudah digunakan
+  const newPasswordHash = await bcrypt.hash(data.new_password, BCRYPT_COST)
+
+  await db.transaction(async (tx) => {
+    // Update password user
+    await tx.update(users)
+      .set({ passwordHash: newPasswordHash, updatedAt: new Date() })
+      .where(eq(users.id, resetToken.userId))
+
+    // Tandai token sudah digunakan (tidak bisa dipakai lagi)
+    await tx.update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(passwordResetTokens.id, resetToken.id))
+  })
 }

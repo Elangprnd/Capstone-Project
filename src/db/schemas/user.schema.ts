@@ -8,7 +8,7 @@ export const authProviderEnum = pgEnum('auth_provider', ['email', 'google'])   /
 
 // INI TABEL USERS 
 export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey().defaultRandom(),                  // id user pakai uuid agar lebih aman 
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: varchar('password_hash', { length: 255 }),
