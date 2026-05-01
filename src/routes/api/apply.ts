@@ -1,5 +1,4 @@
-import express, { Router } from "express";
-// Import middleware dan db dengan ekstensi .js untuk ESM
+import express, { Router, Request, Response } from "express";
 import { authMiddleware, authorizeRole } from "../../middlewares/authMiddleware.js";
 import { db } from "../../db/index.js"; 
 import { missions, applications } from "../../db/schema.js"; 
@@ -8,20 +7,18 @@ import { eq, and } from "drizzle-orm";
 const router: Router = express.Router();
 
 // --- GET MY APPLICATIONS (CAP-63) ---
-router.get("/me", (req, res) => {
+router.get("/me", (req: Request, res: Response) => {
   res.status(200).json({ message: "get my applications endpoint" });
 });
 
-/**
- * APPLY MISSION (CAP-63 s/d CAP-67 Implementation)
- * Alur Guard: Auth -> Role -> Existence (404) -> Status (409) -> Quota (409) -> Duplicate (409)
- */
+// Menambahkan generic type <{ mission_id: string }> agar params tidak merah
 router.post("/:mission_id/apply", 
   authMiddleware, 
   authorizeRole("volunteer"), 
-  async (req, res) => {
-    const missionId = parseInt(req.params.mission_id);
-    const userId = (req as any).user?.id; // Diambil dari decoded token
+  async (req: Request<{ mission_id: string }>, res: Response) => {
+    const { mission_id } = req.params;
+    const missionId = parseInt(mission_id);
+    const userId = (req as any).user?.id; // Tetap pakai any untuk user karena custom property dari middleware
 
     try {
       // 1. Guard: Existence (CAP-65 - 404)
