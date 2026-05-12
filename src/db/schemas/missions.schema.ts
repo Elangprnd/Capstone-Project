@@ -1,15 +1,61 @@
-import { integer, pgTable, varchar, text, timestamp, unique, pgEnum } from "drizzle-orm/pg-core";
+import { 
+  pgTable, uuid, varchar, text, integer, 
+  timestamp, pgEnum, decimal
+} from 'drizzle-orm/pg-core'
+import { users } from './user.schema'
 
 
-// TABEL MISI
-export const missions = pgTable("missions", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  title: varchar({ length: 255 }).notNull(),
-  description: text().notNull(),
-  location: varchar({ length: 255 }).notNull().default("Remote"), 
-  status: varchar({ length: 50 }).notNull().default("menunggu_relawan"),
-  volunteersNeeded: integer("volunteers_needed").notNull().default(0),
-  volunteersApplied: integer("volunteers_applied").notNull().default(0),
-  coordinatorWhatsapp: varchar("coordinator_whatsapp", { length: 20 }), 
-  createdAt: timestamp("created_at").defaultNow(),
-});
+
+// Status misi mengikuti state machine yang sudah didefinisikan di PRD
+export const missionStatusEnum = pgEnum('mission_status', [
+  'menunggu_relawan',   // Baru dibuat, masih terima pendaftar
+  'sedang_berjalan',    // Sedang berlangsung
+  'relawan_terkumpul',  // Kuota penuh, tidak terima pendaftar baru
+  'selesai',            // Sudah selesai
+])
+
+export const missionCategoryEnum = pgEnum('mission_category', [
+  'pendidikan',
+  'tanggap_bencana',
+  'medis',
+  'logistik',
+])
+
+export const missions = pgTable('missions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Relasi ke user yang buat misi (role = lembaga)
+  lembagaId: uuid('lembaga_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description').notNull(),
+  category: missionCategoryEnum('category').notNull(),
+  
+  // Lokasi
+  address: text('address').notNull(),
+  latitude: decimal('latitude', { precision: 10, scale: 7 }).notNull(),
+  longitude: decimal('longitude', { precision: 10, scale: 7 }).notNull(),
+  
+  // Kuota relawan
+  // volunteers_needed = total yang dibutuhkan
+  // volunteers_applied = denormalized count, dijaga sync via DB trigger
+  volunteersNeeded: integer('volunteers_needed').notNull().default(1),
+  volunteersApplied: integer('volunteers_applied').notNull().default(0),
+  
+  // Kontak koordinator lapangan
+  // Hanya visible ke relawan yang sudah approved
+  coordinatorWhatsapp: varchar('coordinator_whatsapp', { length: 20 }),
+  
+  status: missionStatusEnum('status').notNull().default('menunggu_relawan'),
+  
+  // Foto kondisi lapangan (array URL)
+  photos: text('photos').array(),
+  
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+})
+
+export type Mission = typeof missions.$inferSelect
+export type NewMission = typeof missions.$inferInsert

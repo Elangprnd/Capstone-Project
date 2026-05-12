@@ -4,9 +4,9 @@ import { Request, Response, NextFunction } from 'express'
 // Di production sebaiknya pakai Redis
 const loginAttempts = new Map<string, { count: number; lockedUntil: number | null }>()
 
-const MAX_ATTEMPTS = 5        // Maksimal 5 kali gagal
-const WINDOW_MS = 10 * 60 * 1000  // Dalam 10 menit
-const LOCK_DURATION = 15 * 60 * 1000  // Lock 15 menit
+const MAX_ATTEMPTS = 5                             // Maksimal 5 kali gagal
+const WINDOW_MS = 10 * 60 * 1000                    // Dalam 10 menit
+const LOCK_DURATION = 15 * 60 * 1000                // Lock 15 menit
 
 export const loginRateLimiter = (req: Request, res: Response, next: NextFunction): void => {
   const ip = req.ip || req.socket.remoteAddress || 'unknown'

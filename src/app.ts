@@ -1,4 +1,5 @@
 import express from "express";
+import cookieParser from "cookie-parser";
 import { corsMiddleware } from "./middlewares/cors";
 import { jsonParser } from "./middlewares/json";
 
@@ -15,6 +16,7 @@ const app = express();
 // --- MIDDLEWARES ---
 app.use(corsMiddleware);
 app.use(jsonParser);
+app.use(cookieParser());
 
 // --- BASE ROUTES ---
 app.get("/api", (req, res) => {
