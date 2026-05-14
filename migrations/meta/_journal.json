@@ -15,6 +15,20 @@
       "when": 1778496225008,
       "tag": "0001_clammy_orphan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778698464132,
+      "tag": "0002_sleepy_franklin_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778702527341,
+      "tag": "0003_loving_zombie",
+      "breakpoints": true
     }
   ]
 }

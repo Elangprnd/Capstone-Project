@@ -55,6 +55,7 @@ export const missions = pgTable('missions', {
   
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at'),
 })
 
 export type Mission = typeof missions.$inferSelect

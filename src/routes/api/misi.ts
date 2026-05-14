@@ -1,49 +1,31 @@
 import { Router } from 'express'
 import { authenticate, authorize } from '../../middlewares/authMiddleware'
+import * as misiController from '../../controller/misi.controller'
 import * as applyController from '../../controller/apply.controller'
+import { upload } from '../../middlewares/upload'
 
 const router = Router()
 
-// Endpoint apply ada di bawah /missions/:mission_id/apply
-// Guard 1: authenticate (cek JWT)
-// Guard role: authorize('volunteer') — lembaga tidak boleh apply (CAP-64)
-router.post('/:mission_id/apply', authenticate, authorize('volunteer'), applyController.applyMissionHandler)
+// Public routes
+router.get('/', misiController.getAllMissionsHandler)
+router.get('/:id', misiController.getMissionDetailHandler)
 
+// Protected routes (Lembaga/Pelapor only)
+router.post('/', authenticate, authorize('lembaga'), upload.array('foto'), misiController.createMissionHandler)
+router.put('/:id', authenticate, authorize('lembaga'), upload.array('foto'), misiController.updateMissionHandler)
+router.delete('/:id', authenticate, authorize('lembaga'), misiController.deleteMissionHandler)
 
-
-
-
-// ... endpoint misi lainnya (dummy atau sudah ada)
-router.get('/', (req, res) => {
-  res.status(200).json({ message: 'get all misi endpoint' })
-})
-
+// Other mission related routes
 router.get('/pelapor/me', authenticate, authorize('lembaga'), (req, res) => {
   res.status(200).json({ message: 'get my misi pelapor endpoint' })
 })
 
-router.get('/:id', (req, res) => {
-  res.status(200).json({ message: `get misi detail id: ${req.params.id}` })
-})
+router.patch('/:id/status', authenticate, authorize('lembaga'), upload.none(), misiController.updateMissionStatusHandler)
 
-router.post('/', authenticate, authorize('lembaga'), (req, res) => {
-  res.status(200).json({ message: 'create misi endpoint' })
-})
+// CAP-80: GET /api/misi/:id/applicants
+router.get('/:id/applicants', authenticate, authorize('lembaga'), applyController.getApplicantsHandler)
 
-router.put('/:id', authenticate, authorize('lembaga'), (req, res) => {
-  res.status(200).json({ message: `update misi id: ${req.params.id}` })
-})
-
-router.patch('/:id/status', authenticate, authorize('lembaga'), (req, res) => {
-  res.status(200).json({ message: `update status misi id: ${req.params.id}` })
-})
-
-router.delete('/:id', authenticate, (req, res) => {
-  res.status(200).json({ message: `delete misi id: ${req.params.id}` })
-})
-
-router.get('/:id/applicants', authenticate, authorize('lembaga'), (req, res) => {
-  res.status(200).json({ message: `get applicants misi id: ${req.params.id}` })
-})
+// Apply mission (Volunteer only) - Keep existing for compatibility
+router.post('/:mission_id/apply', authenticate, authorize('volunteer'), applyController.applyMissionHandler)
 
 export default router

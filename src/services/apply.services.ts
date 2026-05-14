@@ -1,182 +1,258 @@
 import { db } from '../config/db'
-import { applications, missions } from '../db/schemas'
-import { eq, and } from 'drizzle-orm'
+import { applications, missions, users } from '../db/schemas'
+import { eq, and, isNull } from 'drizzle-orm'
 import pool from '../config/db'
 
 // ================================================
-// CAP-63: HAPPY PATH - Apply Misi
+// CAP-80: POST /api/apply - Create Apply
 // ================================================
 export const applyMission = async (data: {
   missionId: string
   volunteerId: string
 }) => {
-
-  // Kita pakai raw SQL pool untuk SELECT FOR UPDATE
-  // karena Drizzle ORM belum support FOR UPDATE secara native
   const client = await pool.connect()
 
   try {
-    // Mulai transaction
     await client.query('BEGIN')
 
-    // ================================================
-    // GUARD 2: Cek apakah misi ada
-    // Menggunakan SELECT FOR UPDATE untuk lock baris misi
-    // Ini mencegah race condition (CAP-69)
-    // FOR UPDATE = "kunci baris ini sampai transaction selesai"
-    // Jika ada request lain yang juga FOR UPDATE baris yang sama,
-    // dia akan MENUNGGU sampai transaction ini commit/rollback
-    // ================================================
+    // Lock mission row for consistent quota check
     const missionResult = await client.query(
-      `SELECT id, status, volunteers_needed, volunteers_applied, title
+      `SELECT id, status, volunteers_needed, volunteers_applied 
        FROM missions 
-       WHERE id = $1
-       FOR UPDATE`,  // ← Kunci baris ini!
+       WHERE id = $1 AND deleted_at IS NULL
+       FOR UPDATE`,
       [data.missionId]
     )
 
-    // Misi tidak ditemukan
     if (missionResult.rows.length === 0) {
-      await client.query('ROLLBACK')
-      throw { 
-        status: 404, 
-        error: 'MISSION_NOT_FOUND',
-        message: 'Misi tidak ditemukan.' 
-      }
+      throw { status: 404, error: 'MISSION_NOT_FOUND', message: 'Misi tidak ditemukan.' }
     }
 
     const mission = missionResult.rows[0]
 
-    // ================================================
-    // GUARD 3: Cek status misi
-    // Hanya misi dengan status ini yang bisa menerima pendaftar
-    // ================================================
-    const acceptingStatuses = ['menunggu_relawan', 'sedang_berjalan']
-    if (!acceptingStatuses.includes(mission.status)) {
-      await client.query('ROLLBACK')
-      throw { 
-        status: 409, 
-        error: 'MISSION_CLOSED',
-        message: 'Misi ini sudah tidak menerima pendaftaran.' 
-      }
+    // Requirement: Mission must not be closed or finished
+    const closedStatuses = ['selesai', 'relawan_terkumpul', 'sedang_berjalan']
+    if (closedStatuses.includes(mission.status)) {
+      throw { status: 409, error: 'MISSION_CLOSED', message: 'Misi ini sudah tidak menerima pendaftaran.' }
     }
 
-    // ================================================
-    // GUARD 4: Cek kuota
-    // Cek SETELAH lock baris, jadi angkanya pasti akurat
-    // Ini menangkap edge case eventual consistency (CAP-66)
-    // ================================================
-    if (mission.volunteers_applied >= mission.volunteers_needed) {
-      await client.query('ROLLBACK')
-      throw { 
-        status: 409, 
-        error: 'QUOTA_FULL',
-        message: 'Kuota relawan untuk misi ini sudah terpenuhi.' 
-      }
-    }
-
-    // ================================================
-    // GUARD 5: Cek duplikat apply (CAP-67)
-    // ================================================
-    const existingApplication = await client.query(
-      `SELECT id, status FROM applications 
-       WHERE volunteer_id = $1 AND mission_id = $2`,
+    // Requirement: Only volunteers can apply (Handled by middleware, but good to check if mission is available)
+    // Check if volunteer already applied
+    const existing = await client.query(
+      `SELECT id, status FROM applications WHERE volunteer_id = $1 AND mission_id = $2`,
       [data.volunteerId, data.missionId]
     )
 
-    if (existingApplication.rows.length > 0) {
-      await client.query('ROLLBACK')
-      throw { 
-        status: 409, 
-        error: 'ALREADY_APPLIED',
-        // Sertakan status existing agar frontend bisa tampilkan pesan kontekstual
-        existingStatus: existingApplication.rows[0].status,
-        message: 'Anda sudah mendaftar misi ini.' 
+    if (existing.rows.length > 0) {
+      const app = existing.rows[0];
+      if (app.status !== 'cancelled') {
+        throw { status: 409, error: 'ALREADY_APPLIED', message: 'Anda sudah mendaftar ke misi ini' }
       }
+      // If previously cancelled, we allow re-applying by updating the record or creating a new one.
+      // For simplicity and to keep the unique constraint working, we'll update the cancelled one back to pending.
+      await client.query(
+        `UPDATE applications SET status = 'pending', applied_at = NOW(), updated_at = NOW() WHERE id = $1`,
+        [app.id]
+      )
+      await client.query('COMMIT')
+      return { id: app.id, status: 'pending' }
     }
 
-    // ================================================
-    // SEMUA GUARD LOLOS - INSERT application
-    // volunteers_applied akan otomatis increment via DB trigger
-    // ================================================
+    // Insert new application
     const insertResult = await client.query(
-      `INSERT INTO applications (mission_id, volunteer_id, status, applied_at)
-       VALUES ($1, $2, 'pending', NOW())
-       RETURNING id, mission_id, status, applied_at`,
+      `INSERT INTO applications (mission_id, volunteer_id, status, applied_at, updated_at)
+       VALUES ($1, $2, 'pending', NOW(), NOW())
+       RETURNING id, status`,
       [data.missionId, data.volunteerId]
     )
 
-    // Commit transaction
     await client.query('COMMIT')
-
     return insertResult.rows[0]
 
   } catch (error: any) {
-    // Rollback jika ada error yang tidak terduga
     await client.query('ROLLBACK')
-
-    // Handle DB unique constraint violation (safety net CAP-67)
-    // Error code 23505 = unique_violation di PostgreSQL
-    if (error.code === '23505') {
-      throw {
-        status: 409,
-        error: 'ALREADY_APPLIED',
-        existingStatus: 'pending',
-        message: 'Anda sudah mendaftar misi ini.',
-      }
-    }
-
-    // Handle DB check constraint violation (safety net CAP-69)
-    // Error code 23514 = check_violation di PostgreSQL
-    if (error.code === '23514') {
-      throw {
-        status: 409,
-        error: 'QUOTA_FULL',
-        message: 'Kuota relawan untuk misi ini sudah terpenuhi.',
-      }
-    }
-
-    // Re-throw error yang sudah kita definisikan (dari guards di atas)
     throw error
-
   } finally {
-    // Selalu lepaskan koneksi ke pool
     client.release()
   }
 }
 
 // ================================================
-// CAP-68: GET My Applications (Dashboard Relawan)
+// CAP-80: GET /api/misi/:id/applicants
 // ================================================
-export const getMyApplications = async (volunteerId: string) => {
+export const getApplicantsByMission = async (missionId: string, lembagaId: string) => {
+  // Requirement: Only owner can access
+  const [mission] = await db.select().from(missions).where(and(eq(missions.id, missionId), isNull(missions.deletedAt)))
+  
+  if (!mission) {
+    throw { status: 404, error: 'MISSION_NOT_FOUND', message: 'Misi tidak ditemukan.' }
+  }
 
-  // JOIN applications dengan missions untuk ambil detail misi
-  // LEFT JOIN karena misi mungkin sudah dihapus (soft scenario CAP-68)
+  if (mission.lembagaId !== lembagaId) {
+    throw { status: 403, error: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke misi ini.' }
+  }
+
   const result = await pool.query(
     `SELECT 
-      a.id as application_id,
-      a.mission_id,
-      a.status as application_status,
-      a.applied_at,
-      
-      -- Kalau misi dihapus, tampilkan placeholder
-      COALESCE(m.title, '[Misi dihapus]') as mission_title,
-      COALESCE(m.address, '-') as mission_location,
-      COALESCE(m.status::text, 'removed') as mission_status,
-      
-      -- coordinator_whatsapp HANYA muncul kalau status = approved
-      -- Kalau pending/rejected, return null (Data Isolation CAP-68)
-      CASE 
-        WHEN a.status = 'approved' THEN m.coordinator_whatsapp
-        ELSE NULL
-      END as coordinator_whatsapp
-      
+      a.id as apply_id,
+      u.id as user_id,
+      u.name as nama,
+      u.domisili,
+      u.skills as skill,
+      a.status
     FROM applications a
-    LEFT JOIN missions m ON a.mission_id = m.id
-    
-    -- DATA ISOLATION: hanya return data milik volunteer ini
+    JOIN users u ON a.volunteer_id = u.id
+    WHERE a.mission_id = $1 AND a.status != 'cancelled'
+    ORDER BY a.applied_at DESC`,
+    [missionId]
+  )
+
+  return result.rows
+}
+
+// ================================================
+// CAP-80: PATCH /api/apply/:id/approve
+// ================================================
+export const approveApplication = async (applicationId: string, lembagaId: string) => {
+  const client = await pool.connect()
+
+  try {
+    await client.query('BEGIN')
+
+    // Get application and related mission
+    const appResult = await client.query(
+      `SELECT a.id, a.status, a.mission_id, m.status as mission_status, m.lembaga_id, m.volunteers_needed, m.volunteers_applied
+       FROM applications a
+       JOIN missions m ON a.mission_id = m.id
+       WHERE a.id = $1
+       FOR UPDATE OF a`,
+      [applicationId]
+    )
+
+    if (appResult.rows.length === 0) {
+      throw { status: 404, error: 'NOT_FOUND', message: 'Data pendaftaran tidak ditemukan.' }
+    }
+
+    const app = appResult.rows[0]
+
+    // Requirement: Only owner can approve
+    if (app.lembaga_id !== lembagaId) {
+      throw { status: 403, error: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke pendaftaran ini.' }
+    }
+
+    // Requirement: Status must be pending
+    if (app.status !== 'pending') {
+      throw { status: 400, error: 'INVALID_STATUS', message: `Tidak dapat menyetujui pendaftaran dengan status ${app.status}.` }
+    }
+
+    // Requirement: If the mission is already selesai, reject the approval
+    if (app.mission_status === 'selesai') {
+      throw { status: 400, error: 'Mission sudah selesai' }
+    }
+
+    // Requirement: Prevent double approval (handled by status check)
+    // Quota logic: Check if still available
+    if (app.volunteers_applied >= app.volunteers_needed) {
+      throw { status: 400, error: 'Kuota relawan penuh' }
+    }
+
+    // Update status to approved
+    // Trigger will handle volunteers_applied increment and mission status update
+    await client.query(
+      `UPDATE applications SET status = 'approved', updated_at = NOW() WHERE id = $1`,
+      [applicationId]
+    )
+
+    await client.query('COMMIT')
+    return true
+  } catch (error: any) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+// ================================================
+// CAP-80: PATCH /api/apply/:id/reject
+// ================================================
+export const rejectApplication = async (applicationId: string, lembagaId: string, reason?: string) => {
+  const [app] = await db.select().from(applications).where(eq(applications.id, applicationId))
+  
+  if (!app) {
+    throw { status: 404, error: 'NOT_FOUND', message: 'Data pendaftaran tidak ditemukan.' }
+  }
+
+  const [mission] = await db.select().from(missions).where(eq(missions.id, app.missionId))
+  
+  if (mission.lembagaId !== lembagaId) {
+    throw { status: 403, error: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke pendaftaran ini.' }
+  }
+
+  if (mission.status === 'selesai') {
+    throw { status: 400, error: 'Mission sudah selesai' }
+  }
+
+  if (app.status !== 'pending') {
+    throw { status: 400, error: 'INVALID_STATUS', message: 'Hanya pendaftaran pending yang dapat ditolak.' }
+  }
+
+  await db.update(applications)
+    .set({ 
+      status: 'rejected', 
+      rejectedReason: reason,
+      updatedAt: new Date() 
+    })
+    .where(eq(applications.id, applicationId))
+
+  return true
+}
+
+// ================================================
+// CAP-80: DELETE /api/apply/:id - Cancel Apply
+// ================================================
+export const cancelApplication = async (applicationId: string, volunteerId: string) => {
+  const [app] = await db.select().from(applications).where(eq(applications.id, applicationId))
+
+  if (!app) {
+    throw { status: 404, error: 'NOT_FOUND', message: 'Data pendaftaran tidak ditemukan.' }
+  }
+
+  const [mission] = await db.select().from(missions).where(eq(missions.id, app.missionId))
+
+  // Requirement: Only the volunteer who created can cancel
+  if (app.volunteerId !== volunteerId) {
+    throw { status: 403, error: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke pendaftaran ini.' }
+  }
+
+  if (mission.status === 'selesai') {
+    throw { status: 400, error: 'Mission sudah selesai' }
+  }
+
+  // Requirement: Allowed only if status is pending
+  if (app.status !== 'pending') {
+    throw { status: 400, error: 'INVALID_STATUS', message: 'Pendaftaran sudah diproses, tidak dapat dibatalkan.' }
+  }
+
+  await db.update(applications)
+    .set({ status: 'cancelled', updatedAt: new Date() })
+    .where(eq(applications.id, applicationId))
+
+  return true
+}
+
+// ================================================
+// CAP-80: GET /api/apply/me
+// ================================================
+export const getMyApplications = async (volunteerId: string) => {
+  const result = await pool.query(
+    `SELECT 
+      a.mission_id as misi_id,
+      m.title as judul,
+      a.status
+    FROM applications a
+    JOIN missions m ON a.mission_id = m.id
     WHERE a.volunteer_id = $1
-    
     ORDER BY a.applied_at DESC`,
     [volunteerId]
   )

@@ -15,6 +15,8 @@ export const users = pgTable('users', {
   role: roleEnum('role').notNull(),                                                 //enum
   authProvider: authProviderEnum('auth_provider').notNull().default('email'),       // enum
   isProfileComplete: boolean('is_profile_complete').notNull().default(false),
+  domisili: varchar('domisili', { length: 255 }),
+  skills: varchar('skills', { length: 255 }).array(),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
