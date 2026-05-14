@@ -20,9 +20,7 @@ router.get('/pelapor/me', authenticate, authorize('lembaga'), (req, res) => {
   res.status(200).json({ message: 'get my misi pelapor endpoint' })
 })
 
-router.patch('/:id/status', authenticate, authorize('lembaga'), (req, res) => {
-  res.status(200).json({ message: `update status misi id: ${req.params.id}` })
-})
+router.patch('/:id/status', authenticate, authorize('lembaga'), upload.none(), misiController.updateMissionStatusHandler)
 
 // CAP-80: GET /api/misi/:id/applicants
 router.get('/:id/applicants', authenticate, authorize('lembaga'), applyController.getApplicantsHandler)

@@ -1,7 +1,8 @@
 import { db } from "../config/db";
 import { missions, Mission, NewMission } from "../db/schemas/missions.schema";
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, inArray } from "drizzle-orm";
 import { getCoordinates } from "./geocoding.services";
+import { MissionStatusEngine, MissionStatus } from "./misiStatus.services";
 
 export const createMission = async (data: any, lembagaId: string) => {
   const { judul, deskripsi, kategori, alamat, jumlah_relawan, foto } = data;
@@ -43,7 +44,10 @@ export const getAllMissions = async (filters: {
 }) => {
   const { lat, lng, radius, kategori } = filters;
 
-  const conditions = [isNull(missions.deletedAt)];
+  const conditions = [
+    isNull(missions.deletedAt),
+    inArray(missions.status, MissionStatusEngine.getPublicStatuses())
+  ];
 
   // Filter by category
   if (kategori) {
@@ -169,6 +173,10 @@ export const updateMission = async (id: string, data: any) => {
     .returning();
 
   return updated;
+};
+
+export const updateMissionStatus = async (id: string, nextStatus: MissionStatus, lembagaId: string) => {
+  return await MissionStatusEngine.updateStatus(id, nextStatus, lembagaId);
 };
 
 export const deleteMission = async (id: string) => {

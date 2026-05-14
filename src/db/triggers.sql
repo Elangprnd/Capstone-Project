@@ -1,51 +1,106 @@
 
 -- ================================================
--- TRIGGER 1: Increment volunteers_applied saat INSERT applications
+-- TRIGGER 1: Update volunteers_applied based on application status
+-- Hanya menghitung pendaftaran yang statusnya 'approved'
 -- ================================================
-CREATE OR REPLACE FUNCTION increment_volunteers_applied()
+CREATE OR REPLACE FUNCTION update_mission_volunteer_count()
 RETURNS TRIGGER AS $$
 BEGIN
-  UPDATE missions 
-  SET volunteers_applied = volunteers_applied + 1,
-      updated_at = NOW()
-  WHERE id = NEW.mission_id;
-  RETURN NEW;
+  -- INSERT: Jika pendaftaran baru langsung approved
+  IF (TG_OP = 'INSERT') THEN
+    IF (NEW.status = 'approved') THEN
+      UPDATE missions 
+      SET volunteers_applied = volunteers_applied + 1,
+          updated_at = NOW()
+      WHERE id = NEW.mission_id;
+    END IF;
+  
+  -- UPDATE: Jika status berubah ke/dari approved
+  ELSIF (TG_OP = 'UPDATE') THEN
+    -- Dari non-approved ke approved
+    IF (OLD.status != 'approved' AND NEW.status = 'approved') THEN
+      UPDATE missions 
+      SET volunteers_applied = volunteers_applied + 1,
+          updated_at = NOW()
+      WHERE id = NEW.mission_id;
+    -- Dari approved ke non-approved (cancelled/rejected)
+    ELSIF (OLD.status = 'approved' AND NEW.status != 'approved') THEN
+      UPDATE missions 
+      SET volunteers_applied = volunteers_applied - 1,
+          updated_at = NOW()
+      WHERE id = NEW.mission_id;
+    END IF;
+  
+  -- DELETE: Jika pendaftaran dihapus dan sebelumnya approved
+  ELSIF (TG_OP = 'DELETE') THEN
+    IF (OLD.status = 'approved') THEN
+      UPDATE missions 
+      SET volunteers_applied = volunteers_applied - 1,
+          updated_at = NOW()
+      WHERE id = OLD.mission_id;
+    END IF;
+  END IF;
+  
+  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER after_application_insert
-  AFTER INSERT ON applications
+-- Hapus trigger lama jika ada
+DROP TRIGGER IF EXISTS after_application_insert ON applications;
+DROP TRIGGER IF EXISTS after_application_update ON applications;
+DROP TRIGGER IF EXISTS after_application_delete ON applications;
+
+CREATE TRIGGER after_application_change
+  AFTER INSERT OR UPDATE OR DELETE ON applications
   FOR EACH ROW
-  EXECUTE FUNCTION increment_volunteers_applied();
+  EXECUTE FUNCTION update_mission_volunteer_count();
+
 
 -- ================================================
--- TRIGGER 2: Auto update status misi ke relawan_terkumpul
--- saat volunteers_applied = volunteers_needed
+-- TRIGGER 2: Auto update status misi
+-- Sesuai state machine: menunggu_relawan <-> relawan_terkumpul
 -- ================================================
-CREATE OR REPLACE FUNCTION auto_update_mission_status()
+CREATE OR REPLACE FUNCTION sync_mission_status()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Cek apakah volunteers_applied sudah sama dengan volunteers_needed
+  -- Jika kuota terpenuhi, set ke relawan_terkumpul
   IF NEW.volunteers_applied >= NEW.volunteers_needed THEN
-    UPDATE missions
-    SET status = 'relawan_terkumpul',
-        updated_at = NOW()
-    WHERE id = NEW.id
-    AND status = 'menunggu_relawan'; -- Jangan overwrite status lain
+    IF NEW.status = 'menunggu_relawan' THEN
+      UPDATE missions
+      SET status = 'relawan_terkumpul',
+          updated_at = NOW()
+      WHERE id = NEW.id;
+    END IF;
+  -- Jika kuota berkurang di bawah target, kembalikan ke menunggu_relawan
+  -- Hanya jika sebelumnya relawan_terkumpul
+  ELSIF NEW.volunteers_applied < NEW.volunteers_needed THEN
+    IF NEW.status = 'relawan_terkumpul' THEN
+      UPDATE missions
+      SET status = 'menunggu_relawan',
+          updated_at = NOW()
+      WHERE id = NEW.id;
+    END IF;
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER after_mission_volunteers_update
+-- Hapus trigger lama jika ada
+DROP TRIGGER IF EXISTS after_mission_volunteers_update ON missions;
+
+CREATE TRIGGER after_mission_volunteers_sync
   AFTER UPDATE OF volunteers_applied ON missions
   FOR EACH ROW
-  EXECUTE FUNCTION auto_update_mission_status();
+  EXECUTE FUNCTION sync_mission_status();
+
 
 -- ================================================
--- CHECK CONSTRAINT: volunteers_applied tidak boleh melebihi volunteers_needed
--- Ini adalah safety net terakhir untuk mencegah over-quota
+-- CHECK CONSTRAINT: volunteers_applied tidak boleh negatif
 -- ================================================
-ALTER TABLE missions 
-ADD CONSTRAINT check_volunteers_not_exceed
-CHECK (volunteers_applied <= volunteers_needed);
+ALTER TABLE missions DROP CONSTRAINT IF EXISTS check_volunteers_non_negative;
+ALTER TABLE missions ADD CONSTRAINT check_volunteers_non_negative 
+CHECK (volunteers_applied >= 0);
+
+-- Note: Constraint volunteers_applied <= volunteers_needed sengaja tidak dipasang
+-- karena bisa saja admin meng-approve sedikit lebih banyak dari kuota awal
+-- atau kuota dikurangi setelah ada yang di-approve.

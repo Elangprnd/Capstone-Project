@@ -31,7 +31,7 @@ export const applyMission = async (data: {
     const mission = missionResult.rows[0]
 
     // Requirement: Mission must not be closed or finished
-    const closedStatuses = ['selesai', 'relawan_terkumpul']
+    const closedStatuses = ['selesai', 'relawan_terkumpul', 'sedang_berjalan']
     if (closedStatuses.includes(mission.status)) {
       throw { status: 409, error: 'MISSION_CLOSED', message: 'Misi ini sudah tidak menerima pendaftaran.' }
     }
@@ -121,7 +121,7 @@ export const approveApplication = async (applicationId: string, lembagaId: strin
 
     // Get application and related mission
     const appResult = await client.query(
-      `SELECT a.id, a.status, a.mission_id, m.lembaga_id, m.volunteers_needed, m.volunteers_applied
+      `SELECT a.id, a.status, a.mission_id, m.status as mission_status, m.lembaga_id, m.volunteers_needed, m.volunteers_applied
        FROM applications a
        JOIN missions m ON a.mission_id = m.id
        WHERE a.id = $1
@@ -145,10 +145,15 @@ export const approveApplication = async (applicationId: string, lembagaId: strin
       throw { status: 400, error: 'INVALID_STATUS', message: `Tidak dapat menyetujui pendaftaran dengan status ${app.status}.` }
     }
 
+    // Requirement: If the mission is already selesai, reject the approval
+    if (app.mission_status === 'selesai') {
+      throw { status: 400, error: 'Mission sudah selesai' }
+    }
+
     // Requirement: Prevent double approval (handled by status check)
     // Quota logic: Check if still available
     if (app.volunteers_applied >= app.volunteers_needed) {
-      throw { status: 409, error: 'QUOTA_FULL', message: 'Kuota relawan sudah penuh' }
+      throw { status: 400, error: 'Kuota relawan penuh' }
     }
 
     // Update status to approved
@@ -184,6 +189,10 @@ export const rejectApplication = async (applicationId: string, lembagaId: string
     throw { status: 403, error: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke pendaftaran ini.' }
   }
 
+  if (mission.status === 'selesai') {
+    throw { status: 400, error: 'Mission sudah selesai' }
+  }
+
   if (app.status !== 'pending') {
     throw { status: 400, error: 'INVALID_STATUS', message: 'Hanya pendaftaran pending yang dapat ditolak.' }
   }
@@ -209,9 +218,15 @@ export const cancelApplication = async (applicationId: string, volunteerId: stri
     throw { status: 404, error: 'NOT_FOUND', message: 'Data pendaftaran tidak ditemukan.' }
   }
 
+  const [mission] = await db.select().from(missions).where(eq(missions.id, app.missionId))
+
   // Requirement: Only the volunteer who created can cancel
   if (app.volunteerId !== volunteerId) {
     throw { status: 403, error: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke pendaftaran ini.' }
+  }
+
+  if (mission.status === 'selesai') {
+    throw { status: 400, error: 'Mission sudah selesai' }
   }
 
   // Requirement: Allowed only if status is pending

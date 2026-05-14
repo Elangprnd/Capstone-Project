@@ -118,6 +118,56 @@ export const updateMissionHandler = async (req: Request, res: Response) => {
   }
 };
 
+export const updateMissionStatusHandler = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ID as UUID
+    const idSchema = z.string().uuid({ message: "Format ID misi tidak valid" });
+    const parsedId = idSchema.safeParse(id);
+    if (!parsedId.success) {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        errors: { id: parsedId.error.flatten().formErrors },
+      });
+    }
+
+    const statusSchema = z.object({
+      status: z.enum(["berjalan", "selesai"], {
+        errorMap: () => ({ message: "Status harus 'berjalan' atau 'selesai'" }),
+      }),
+    });
+
+    const parsedBody = statusSchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        message: "Payload tidak valid",
+        errors: {
+          ...parsedBody.error.flatten().fieldErrors,
+          _form: parsedBody.error.flatten().formErrors,
+        },
+      });
+    }
+
+    const statusMap: Record<string, any> = {
+      berjalan: "sedang_berjalan",
+      selesai: "selesai",
+    };
+
+    const lembagaId = req.user!.user_id;
+    await misiService.updateMissionStatus(id, statusMap[parsedBody.data.status], lembagaId);
+
+    res.status(200).json({ message: "Status misi berhasil diperbarui" });
+  } catch (error: any) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.error, message: error.message });
+    }
+    console.error("Update mission status error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const deleteMissionHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
