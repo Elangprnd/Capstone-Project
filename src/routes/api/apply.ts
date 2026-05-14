@@ -4,41 +4,44 @@ import { authenticate, authorize } from '../../middlewares/authMiddleware'
 
 const router = Router()
 
-// GET riwayat apply milik relawan yang login
-// Guard 1 (authenticate) + Guard role (authorize volunteer only)
+// CAP-80: GET /api/apply/me
 router.get(
   '/me',
-  authenticate,                    // Cek JWT valid
-  authorize('volunteer'),          // Cek role = volunteer (CAP-68: lembaga → 403)
+  authenticate,
+  authorize('volunteer'),
   applyController.getMyApplicationsHandler
 )
 
-
-
-
-// opsional belum terlalu dipake
-// POST apply ke misi
-// Guard 1 sudah di-handle oleh middleware di sini
+// CAP-80: POST /api/apply
 router.post(
-  '/:application_id/approve',
+  '/',
   authenticate,
-  authorize('lembaga'),
-  (req, res) => res.status(200).json({ message: 'approve endpoint - coming soon' })
+  authorize('volunteer'),
+  applyController.applyMissionHandler
 )
 
+// CAP-80: PATCH /api/apply/:id/approve
 router.patch(
-  '/:application_id/reject',
+  '/:id/approve',
   authenticate,
   authorize('lembaga'),
-  (req, res) => res.status(200).json({ message: 'reject endpoint - coming soon' })
+  applyController.approveApplicationHandler
 )
 
-// DELETE batalkan apply (hanya jika masih pending)
+// CAP-80: PATCH /api/apply/:id/reject
+router.patch(
+  '/:id/reject',
+  authenticate,
+  authorize('lembaga'),
+  applyController.rejectApplicationHandler
+)
+
+// CAP-80: DELETE /api/apply/:id - Cancel Apply
 router.delete(
   '/:id',
   authenticate,
   authorize('volunteer'),
-  (req, res) => res.status(200).json({ message: 'cancel apply endpoint - coming soon' })
+  applyController.cancelApplicationHandler
 )
 
 export default router

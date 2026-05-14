@@ -8,6 +8,7 @@ export const applicationStatusEnum = pgEnum('application_status', [
   'pending',    // Baru apply, menunggu persetujuan
   'approved',   // Disetujui lembaga
   'rejected',   // Ditolak lembaga
+  'cancelled',  // Dibatalkan relawan
 ])
 
 export const applications = pgTable('applications', {
@@ -24,6 +25,8 @@ export const applications = pgTable('applications', {
     .references(() => users.id, { onDelete: 'cascade' }),
   
   status: applicationStatusEnum('status').notNull().default('pending'),
+
+  rejectedReason: varchar('rejected_reason', { length: 255 }),
   
   appliedAt: timestamp('applied_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
