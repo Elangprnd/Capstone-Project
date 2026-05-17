@@ -1,7 +1,22 @@
-CREATE TYPE "public"."auth_provider" AS ENUM('email', 'google');--> statement-breakpoint
-CREATE TYPE "public"."role" AS ENUM('volunteer', 'lembaga', 'super_admin');--> statement-breakpoint
-CREATE TYPE "public"."apply_status" AS ENUM('pending', 'approved', 'rejected');--> statement-breakpoint
-CREATE TABLE "users" (
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'auth_provider') THEN
+        CREATE TYPE "public"."auth_provider" AS ENUM('email', 'google');
+    END IF;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'role') THEN
+        CREATE TYPE "public"."role" AS ENUM('volunteer', 'lembaga', 'super_admin');
+    END IF;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'apply_status') THEN
+        CREATE TYPE "public"."apply_status" AS ENUM('pending', 'approved', 'rejected');
+    END IF;
+END $$;
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(255) NOT NULL,
 	"email" varchar(255) NOT NULL,
@@ -15,7 +30,7 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
-CREATE TABLE "password_reset_tokens" (
+CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"token_hash" varchar(255) NOT NULL,
@@ -24,7 +39,7 @@ CREATE TABLE "password_reset_tokens" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "applications" (
+CREATE TABLE IF NOT EXISTS "applications" (
 	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "applications_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"volunteer_id" uuid NOT NULL,
 	"mission_id" integer NOT NULL,
@@ -33,7 +48,7 @@ CREATE TABLE "applications" (
 	CONSTRAINT "applications_volunteer_id_mission_id_unique" UNIQUE("volunteer_id","mission_id")
 );
 --> statement-breakpoint
-CREATE TABLE "missions" (
+CREATE TABLE IF NOT EXISTS "missions" (
 	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "missions_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"title" varchar(255) NOT NULL,
 	"description" text NOT NULL,
@@ -45,6 +60,20 @@ CREATE TABLE "missions" (
 	"created_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
-ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "applications" ADD CONSTRAINT "applications_volunteer_id_users_id_fk" FOREIGN KEY ("volunteer_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "applications" ADD CONSTRAINT "applications_mission_id_missions_id_fk" FOREIGN KEY ("mission_id") REFERENCES "public"."missions"("id") ON DELETE no action ON UPDATE no action;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'password_reset_tokens_user_id_users_id_fk') THEN
+        ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+    END IF;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'applications_volunteer_id_users_id_fk') THEN
+        ALTER TABLE "applications" ADD CONSTRAINT "applications_volunteer_id_users_id_fk" FOREIGN KEY ("volunteer_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
+    END IF;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'applications_mission_id_missions_id_fk') THEN
+        ALTER TABLE "applications" ADD CONSTRAINT "applications_mission_id_missions_id_fk" FOREIGN KEY ("mission_id") REFERENCES "public"."missions"("id") ON DELETE no action ON UPDATE no action;
+    END IF;
+END $$;

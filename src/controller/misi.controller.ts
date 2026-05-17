@@ -168,6 +168,17 @@ export const updateMissionStatusHandler = async (req: Request, res: Response) =>
   }
 };
 
+export const getMyMissionsHandler = async (req: Request, res: Response) => {
+  try {
+    const lembagaId = req.user!.user_id;
+    const missions = await misiService.getMissionsByLembagaId(lembagaId);
+    res.status(200).json(missions);
+  } catch (error) {
+    console.error("Get my missions error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const deleteMissionHandler = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
