@@ -1,5 +1,7 @@
 import express from "express";
 import cookieParser from "cookie-parser";
+import { apiReference } from "@scalar/express-api-reference"
+import { openAPISpec } from "./docs/openapi";
 import { corsMiddleware } from "./middlewares/cors";
 import { jsonParser } from "./middlewares/json";
 
@@ -17,6 +19,26 @@ const app = express();
 app.use(corsMiddleware);
 app.use(jsonParser);
 app.use(cookieParser());
+
+
+
+// SCALAR API DOCS
+app.get("/openapi.json", (req, res) => {
+  res.json(openAPISpec)
+})
+
+app.use(
+  "/docs",
+  apiReference({
+    spec: { url: "/openapi.json" },
+    theme: "purple",         
+    layout: "modern",        
+    defaultHttpClient: {
+      targetKey: "javascript",
+      clientKey: "fetch",
+    },
+  })
+)
 
 // --- BASE ROUTES ---
 app.get("/api", (req, res) => {

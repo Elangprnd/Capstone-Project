@@ -134,6 +134,35 @@ export const getMissionById = async (id: string) => {
   };
 };
 
+export const getMissionsByLembagaId = async (lembagaId: string) => {
+  const allMissions = await db
+    .select()
+    .from(missions)
+    .where(and(eq(missions.lembagaId, lembagaId), isNull(missions.deletedAt)));
+
+  const reverseCategoryMap: Record<string, string> = {
+    "tanggap_bencana": "Bencana",
+    "pendidikan": "Pendidikan",
+    "medis": "Medis",
+    "logistik": "Logistik",
+  };
+
+  const statusMap: Record<string, string> = {
+    "menunggu_relawan": "Open",
+    "sedang_berjalan": "In Progress",
+    "relawan_terkumpul": "Full",
+    "selesai": "Completed",
+  };
+
+  return allMissions.map((m) => ({
+    ...m,
+    kategori: reverseCategoryMap[m.category] || m.category,
+    status: statusMap[m.status] || m.status,
+    latitude: parseFloat(m.latitude),
+    longitude: parseFloat(m.longitude),
+  }));
+};
+
 export const updateMission = async (id: string, data: any) => {
   const { judul, deskripsi, kategori, alamat, jumlah_relawan, foto } = data;
 

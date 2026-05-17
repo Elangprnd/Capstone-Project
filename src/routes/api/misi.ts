@@ -14,12 +14,7 @@ router.get('/:id', misiController.getMissionDetailHandler)
 router.post('/', authenticate, authorize('lembaga'), upload.array('foto'), misiController.createMissionHandler)
 router.put('/:id', authenticate, authorize('lembaga'), upload.array('foto'), misiController.updateMissionHandler)
 router.delete('/:id', authenticate, authorize('lembaga'), misiController.deleteMissionHandler)
-
-// Other mission related routes
-router.get('/pelapor/me', authenticate, authorize('lembaga'), (req, res) => {
-  res.status(200).json({ message: 'get my misi pelapor endpoint' })
-})
-
+router.get('/pelapor/me', authenticate, authorize('lembaga'), misiController.getMyMissionsHandler)
 router.patch('/:id/status', authenticate, authorize('lembaga'), upload.none(), misiController.updateMissionStatusHandler)
 
 // CAP-80: GET /api/misi/:id/applicants

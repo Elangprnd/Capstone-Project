@@ -29,6 +29,13 @@
       "when": 1778702527341,
       "tag": "0003_loving_zombie",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778702527342,
+      "tag": "0004_restore_deleted_at",
+      "breakpoints": true
     }
   ]
 }
