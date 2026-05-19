@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { z } from 'zod'
 import * as applyService from '../services/apply.services'
+import { uploadToCloudinary } from '../services/upload.services'
 
 // ZOD SCHEMAS
 
@@ -19,9 +20,22 @@ const applicationParamSchema = z.object({
 })
 
 const applyBodySchema = z.object({
-  misi_id: z
-    .string({ message: 'misi_id wajib diisi' })
-    .uuid({ message: 'Format misi_id tidak valid' }),
+  mission_id: z
+    .string({ message: 'mission_id wajib diisi' })
+    .uuid({ message: 'Format mission_id tidak valid' }),
+  full_name: z.string().min(1, 'Nama lengkap wajib diisi'),
+  birth_date: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    message: 'Format tanggal lahir tidak valid',
+  }),
+  phone_number: z.string().min(1, 'Nomor telepon wajib diisi'),
+  domicile: z.string().min(1, 'Domisili wajib diisi'),
+  video_link: z
+    .string()
+    .url('Link video harus berupa URL yang valid')
+    .optional()
+    .nullable()
+    .or(z.literal(''))
+    .transform((val) => (val === '' ? null : val)),
 })
 
 const rejectBodySchema = z.object({
@@ -33,33 +47,49 @@ const rejectBodySchema = z.object({
 // ================================================
 export const applyMissionHandler = async (req: Request, res: Response): Promise<void> => {
   try {
-    let missionId: string | undefined
-
-    // Cek di body (sesuai CAP-80)
-    const parsedBody = applyBodySchema.safeParse(req.body)
-    if (parsedBody.success) {
-      missionId = parsedBody.data.misi_id
-    } else {
-      // Cek di params (legacy compatibility)
-      const parsedParams = z.object({ mission_id: z.string().uuid() }).safeParse(req.params)
-      if (parsedParams.success) {
-        missionId = parsedParams.data.mission_id
-      }
+    // Merge params into body for validation if mission_id is missing in body
+    const bodyToValidate = { ...req.body }
+    if (!bodyToValidate.mission_id && req.params.mission_id) {
+      bodyToValidate.mission_id = req.params.mission_id
     }
 
-    if (!missionId) {
-      res.status(400).json({
+    // 1. Validasi Body
+    const parsedBody = applyBodySchema.safeParse(bodyToValidate)
+    if (!parsedBody.success) {
+      res.status(422).json({
         error: 'VALIDATION_ERROR',
-        message: 'misi_id wajib diisi dalam format UUID',
+        message: 'Input tidak valid',
+        errors: parsedBody.error.flatten().fieldErrors,
       })
       return
     }
 
-    const volunteerId = req.user!.user_id
+    const { mission_id, full_name, birth_date, phone_number, domicile, video_link } = parsedBody.data
 
+    // 2. Validasi File (Skills)
+    if (!req.file) {
+      res.status(422).json({
+        error: 'VALIDATION_ERROR',
+        message: 'File skills (CV/Portofolio) wajib diupload',
+      })
+      return
+    }
+
+    // 3. Upload ke Cloudinary
+    const uploadResult = await uploadToCloudinary(req.file.buffer, 'applications/skills')
+
+    // 4. Panggil Service
+    const volunteerId = req.user!.user_id
     const application = await applyService.applyMission({
-      missionId,
+      missionId: mission_id,
       volunteerId,
+      fullName: full_name,
+      birthDate: new Date(birth_date),
+      phoneNumber: phone_number,
+      domicile,
+      skillsUrl: uploadResult.secure_url,
+      skillsPublicId: uploadResult.public_id,
+      videoLink: video_link || undefined,
     })
 
     res.status(201).json({

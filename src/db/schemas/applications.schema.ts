@@ -1,5 +1,5 @@
 import { 
-  pgTable, uuid, varchar, timestamp, pgEnum, unique
+  pgTable, uuid, varchar, timestamp, pgEnum, unique, text
 } from 'drizzle-orm/pg-core'
 import { users } from './user.schema'
 import { missions } from './missions.schema'
@@ -27,6 +27,14 @@ export const applications = pgTable('applications', {
   status: applicationStatusEnum('status').notNull().default('pending'),
 
   rejectedReason: varchar('rejected_reason', { length: 255 }),
+
+  fullName: varchar('full_name', { length: 255 }),
+  birthDate: timestamp('birth_date'),
+  phoneNumber: varchar('phone_number', { length: 20 }),
+  domicile: varchar('domicile', { length: 255 }),
+  skillsUrl: text('skills_url'),
+  skillsPublicId: varchar('skills_public_id', { length: 255 }),
+  videoLink: text('video_link'),
   
   appliedAt: timestamp('applied_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

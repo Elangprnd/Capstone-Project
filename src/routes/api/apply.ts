@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import * as applyController from '../../controller/apply.controller'
 import { authenticate, authorize } from '../../middlewares/authMiddleware'
+import { upload } from '../../middlewares/upload'
 
 const router = Router()
 
@@ -17,6 +18,7 @@ router.post(
   '/',
   authenticate,
   authorize('volunteer'),
+  upload.single('skills'),
   applyController.applyMissionHandler
 )
 

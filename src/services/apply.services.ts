@@ -9,6 +9,13 @@ import pool from '../config/db'
 export const applyMission = async (data: {
   missionId: string
   volunteerId: string
+  fullName: string
+  birthDate: Date
+  phoneNumber: string
+  domicile: string
+  skillsUrl: string
+  skillsPublicId: string
+  videoLink?: string
 }) => {
   const client = await pool.connect()
 
@@ -17,7 +24,7 @@ export const applyMission = async (data: {
 
     // Lock mission row for consistent quota check
     const missionResult = await client.query(
-      `SELECT id, status, volunteers_needed, volunteers_applied 
+      `SELECT id, status, volunteers_needed, volunteers_applied, event_mode 
        FROM missions 
        WHERE id = $1 AND deleted_at IS NULL
        FOR UPDATE`,
@@ -36,7 +43,15 @@ export const applyMission = async (data: {
       throw { status: 409, error: 'MISSION_CLOSED', message: 'Misi ini sudah tidak menerima pendaftaran.' }
     }
 
-    // Requirement: Only volunteers can apply (Handled by middleware, but good to check if mission is available)
+    // Conditional Validation: video_link required if mission is online
+    if (mission.event_mode === 'online' && !data.videoLink) {
+      throw { 
+        status: 422, 
+        error: 'VALIDATION_ERROR', 
+        message: 'Video link wajib diisi untuk misi online.' 
+      }
+    }
+
     // Check if volunteer already applied
     const existing = await client.query(
       `SELECT id, status FROM applications WHERE volunteer_id = $1 AND mission_id = $2`,
@@ -49,10 +64,29 @@ export const applyMission = async (data: {
         throw { status: 409, error: 'ALREADY_APPLIED', message: 'Anda sudah mendaftar ke misi ini' }
       }
       // If previously cancelled, we allow re-applying by updating the record or creating a new one.
-      // For simplicity and to keep the unique constraint working, we'll update the cancelled one back to pending.
       await client.query(
-        `UPDATE applications SET status = 'pending', applied_at = NOW(), updated_at = NOW() WHERE id = $1`,
-        [app.id]
+        `UPDATE applications SET 
+          status = 'pending', 
+          full_name = $2,
+          birth_date = $3,
+          phone_number = $4,
+          domicile = $5,
+          skills_url = $6,
+          skills_public_id = $7,
+          video_link = $8,
+          applied_at = NOW(), 
+          updated_at = NOW() 
+         WHERE id = $1`,
+        [
+          app.id, 
+          data.fullName, 
+          data.birthDate, 
+          data.phoneNumber, 
+          data.domicile, 
+          data.skillsUrl, 
+          data.skillsPublicId, 
+          data.videoLink || null
+        ]
       )
       await client.query('COMMIT')
       return { id: app.id, status: 'pending' }
@@ -60,10 +94,25 @@ export const applyMission = async (data: {
 
     // Insert new application
     const insertResult = await client.query(
-      `INSERT INTO applications (mission_id, volunteer_id, status, applied_at, updated_at)
-       VALUES ($1, $2, 'pending', NOW(), NOW())
+      `INSERT INTO applications (
+        mission_id, volunteer_id, status, 
+        full_name, birth_date, phone_number, domicile, 
+        skills_url, skills_public_id, video_link,
+        applied_at, updated_at
+      )
+       VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
        RETURNING id, status`,
-      [data.missionId, data.volunteerId]
+      [
+        data.missionId, 
+        data.volunteerId, 
+        data.fullName, 
+        data.birthDate, 
+        data.phoneNumber, 
+        data.domicile, 
+        data.skillsUrl, 
+        data.skillsPublicId, 
+        data.videoLink || null
+      ]
     )
 
     await client.query('COMMIT')
@@ -96,9 +145,12 @@ export const getApplicantsByMission = async (missionId: string, lembagaId: strin
     `SELECT 
       a.id as apply_id,
       u.id as user_id,
-      u.name as nama,
-      u.domisili,
-      u.skills as skill,
+      COALESCE(a.full_name, u.name) as full_name,
+      a.birth_date,
+      a.phone_number,
+      a.domicile,
+      a.skills_url,
+      a.video_link,
       a.status
     FROM applications a
     JOIN users u ON a.volunteer_id = u.id
