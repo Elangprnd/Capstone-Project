@@ -21,6 +21,6 @@ router.patch('/:id/status', authenticate, authorize('lembaga'), upload.none(), m
 router.get('/:id/applicants', authenticate, authorize('lembaga'), applyController.getApplicantsHandler)
 
 // Apply mission (Volunteer only) - Keep existing for compatibility
-router.post('/:mission_id/apply', authenticate, authorize('volunteer'), applyController.applyMissionHandler)
+router.post('/:mission_id/apply', authenticate, authorize('volunteer'), upload.single('skills'), applyController.applyMissionHandler)
 
 export default router

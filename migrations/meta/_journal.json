@@ -64,6 +64,13 @@
       "when": 1779128986816,
       "tag": "0008_red_vertigo",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779215598382,
+      "tag": "0009_volatile_vanisher",
+      "breakpoints": true
     }
   ]
 }
