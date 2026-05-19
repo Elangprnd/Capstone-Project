@@ -5,10 +5,24 @@ import { getCoordinates } from "./geocoding.services";
 import { MissionStatusEngine, MissionStatus } from "./misiStatus.services";
 
 export const createMission = async (data: any, lembagaId: string) => {
-  const { judul, deskripsi, kategori, alamat, jumlah_relawan, foto } = data;
+  const { 
+    judul, deskripsi, kategori, location, jumlah_relawan, 
+    foto, event_mode, contact_link, startDate, endDate 
+  } = data;
 
-  // Geocoding
-  const coords = await getCoordinates(alamat);
+  let latitude: string | null = null;
+  let longitude: string | null = null;
+
+  // Geocoding logic based on event_mode
+  if (event_mode === 'offline') {
+    const coords = await getCoordinates(location);
+    latitude = coords.latitude.toString();
+    longitude = coords.longitude.toString();
+  } else if (event_mode === 'online') {
+    // Optional geocoding for online, but recommended to skip
+    latitude = null;
+    longitude = null;
+  }
 
   // Map kategori to schema enum
   const categoryMap: Record<string, any> = {
@@ -18,16 +32,20 @@ export const createMission = async (data: any, lembagaId: string) => {
     "Logistik": "logistik",
   };
 
-  const dbCategory = categoryMap[kategori] || "tanggap_bencana";
+  const dbCategory = categoryMap[kategori] || kategori;
 
   const newMission: NewMission = {
     lembagaId,
     title: judul,
     description: deskripsi,
     category: dbCategory,
-    address: alamat,
-    latitude: coords.latitude.toString(),
-    longitude: coords.longitude.toString(),
+    eventMode: event_mode,
+    location: location,
+    latitude,
+    longitude,
+    startDate,
+    endDate,
+    contactLink: contact_link,
     volunteersNeeded: jumlah_relawan,
     photos: foto,
   };
@@ -67,6 +85,9 @@ export const getAllMissions = async (filters: {
   let filtered = allMissions;
   if (lat && lng && radius) {
     filtered = allMissions.filter((m) => {
+      // Only include missions where latitude and longitude are NOT NULL
+      if (m.latitude === null || m.longitude === null) return false;
+      
       const distance = calculateDistance(
         lat,
         lng,
@@ -94,12 +115,14 @@ export const getAllMissions = async (filters: {
 
   return filtered.map((m) => ({
     id: m.id,
-    judul: m.title,
-    kategori: reverseCategoryMap[m.category] || m.category,
-    latitude: parseFloat(m.latitude),
-    longitude: parseFloat(m.longitude),
+    title: m.judul || m.title, // Handle both for safety
+    category: reverseCategoryMap[m.category] || m.category,
+    location: m.location,
+    latitude: m.latitude ? parseFloat(m.latitude) : null,
+    longitude: m.longitude ? parseFloat(m.longitude) : null,
+    event_mode: m.eventMode,
     status: statusMap[m.status] || m.status,
-    jumlah_relawan: m.volunteersNeeded,
+    number_of_volunteers: m.volunteersNeeded,
   }));
 };
 
@@ -126,11 +149,23 @@ export const getMissionById = async (id: string) => {
   };
 
   return {
-    ...mission,
-    kategori: reverseCategoryMap[mission.category] || mission.category,
+    id: mission.id,
+    title: mission.title,
+    description: mission.description,
+    category: reverseCategoryMap[mission.category] || mission.category,
+    event_mode: mission.eventMode,
+    location: mission.location,
+    latitude: mission.latitude ? parseFloat(mission.latitude) : null,
+    longitude: mission.longitude ? parseFloat(mission.longitude) : null,
+    start_date: mission.startDate,
+    end_date: mission.endDate,
+    contact_link: mission.contactLink,
+    number_of_volunteers: mission.volunteersNeeded,
+    volunteers_applied: mission.volunteersApplied,
+    photos: mission.photos,
     status: statusMap[mission.status] || mission.status,
-    latitude: parseFloat(mission.latitude),
-    longitude: parseFloat(mission.longitude),
+    createdAt: mission.createdAt,
+    updatedAt: mission.updatedAt,
   };
 };
 
@@ -155,27 +190,54 @@ export const getMissionsByLembagaId = async (lembagaId: string) => {
   };
 
   return allMissions.map((m) => ({
-    ...m,
-    kategori: reverseCategoryMap[m.category] || m.category,
+    id: m.id,
+    title: m.title,
+    description: m.description,
+    category: reverseCategoryMap[m.category] || m.category,
+    event_mode: m.eventMode,
+    location: m.location,
+    latitude: m.latitude ? parseFloat(m.latitude) : null,
+    longitude: m.longitude ? parseFloat(m.longitude) : null,
+    start_date: m.startDate,
+    end_date: m.endDate,
+    contact_link: m.contactLink,
+    number_of_volunteers: m.volunteersNeeded,
+    volunteers_applied: m.volunteersApplied,
+    photos: m.photos,
     status: statusMap[m.status] || m.status,
-    latitude: parseFloat(m.latitude),
-    longitude: parseFloat(m.longitude),
+    createdAt: m.createdAt,
+    updatedAt: m.updatedAt,
   }));
 };
 
 export const updateMission = async (id: string, data: any) => {
-  const { judul, deskripsi, kategori, alamat, jumlah_relawan, foto } = data;
+  const { 
+    judul, deskripsi, kategori, location, jumlah_relawan, 
+    foto, event_mode, contact_link, startDate, endDate 
+  } = data;
 
   const [existing] = await db.select().from(missions).where(eq(missions.id, id));
   if (!existing) throw new Error("MISI_TIDAK_DITEMUKAN");
 
   let latitude = existing.latitude;
   let longitude = existing.longitude;
+  const currentEventMode = event_mode || existing.eventMode;
+  const currentLocation = location || existing.location;
 
-  if (alamat && alamat !== existing.address) {
-    const coords = await getCoordinates(alamat);
+  // Re-run geocoding if:
+  // 1. location changes AND event_mode is offline
+  // 2. event_mode changes from online to offline
+  const locationChanged = location && location !== existing.location;
+  const modeChangedToOffline = event_mode === 'offline' && existing.eventMode === 'online';
+  
+  if ((locationChanged && currentEventMode === 'offline') || modeChangedToOffline) {
+    const coords = await getCoordinates(currentLocation);
     latitude = coords.latitude.toString();
     longitude = coords.longitude.toString();
+  } else if (event_mode === 'online' && existing.eventMode === 'offline') {
+    // If changing from offline to online, we can nullify coordinates
+    latitude = null;
+    longitude = null;
   }
 
   const categoryMap: Record<string, any> = {
@@ -189,7 +251,13 @@ export const updateMission = async (id: string, data: any) => {
     ...(judul && { title: judul }),
     ...(deskripsi && { description: deskripsi }),
     ...(kategori && { category: categoryMap[kategori] || kategori }),
-    ...(alamat && { address: alamat, latitude, longitude }),
+    ...(location && { location }),
+    ...(event_mode && { eventMode: event_mode }),
+    ...(contact_link !== undefined && { contactLink: contact_link }),
+    ...(startDate && { startDate }),
+    ...(endDate && { endDate }),
+    latitude,
+    longitude,
     ...(jumlah_relawan && { volunteersNeeded: jumlah_relawan }),
     ...(foto && { photos: foto }),
     updatedAt: new Date(),

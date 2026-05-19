@@ -21,6 +21,8 @@ export const missionCategoryEnum = pgEnum('mission_category', [
   'logistik',
 ])
 
+export const eventModeEnum = pgEnum('event_mode', ['offline', 'online'])
+
 export const missions = pgTable('missions', {
   id: uuid('id').primaryKey().defaultRandom(),
   
@@ -34,9 +36,14 @@ export const missions = pgTable('missions', {
   category: missionCategoryEnum('category').notNull(),
   
   // Lokasi
-  address: text('address').notNull(),
-  latitude: decimal('latitude', { precision: 10, scale: 7 }).notNull(),
-  longitude: decimal('longitude', { precision: 10, scale: 7 }).notNull(),
+  eventMode: eventModeEnum('event_mode').notNull().default('offline'),
+  location: text('location').notNull(),
+  latitude: decimal('latitude', { precision: 10, scale: 7 }),
+  longitude: decimal('longitude', { precision: 10, scale: 7 }),
+  
+  startDate: timestamp('start_date'),
+  endDate: timestamp('end_date'),
+  contactLink: varchar('contact_link', { length: 255 }),
   
   // Kuota relawan
   // volunteers_needed = total yang dibutuhkan

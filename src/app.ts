@@ -3,7 +3,7 @@ import cookieParser from "cookie-parser";
 import { apiReference } from "@scalar/express-api-reference"
 import { openAPISpec } from "./docs/openapi";
 import { corsMiddleware } from "./middlewares/cors";
-import { jsonParser } from "./middlewares/json";
+import { jsonParser, urlencodedParser } from "./middlewares/json";
 
 // Import semua router dari folder routes/api
 import authRouter from "./routes/api/auth";
@@ -18,6 +18,7 @@ const app = express();
 // --- MIDDLEWARES ---
 app.use(corsMiddleware);
 app.use(jsonParser);
+app.use(urlencodedParser);
 app.use(cookieParser());
 
 

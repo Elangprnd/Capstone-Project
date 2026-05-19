@@ -26,3 +26,12 @@ export const uploadMultipleToCloudinary = async (fileBuffers: Buffer[], folder: 
   const results = await Promise.all(uploadPromises);
   return results.map(result => result.secure_url);
 };
+
+export const deleteFromCloudinary = async (publicId: string): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.destroy(publicId, (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    });
+  });
+};

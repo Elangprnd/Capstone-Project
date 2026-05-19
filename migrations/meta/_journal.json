@@ -36,6 +36,34 @@
       "when": 1778702527342,
       "tag": "0004_restore_deleted_at",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779126694992,
+      "tag": "0005_clean_randall",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779128455528,
+      "tag": "0006_lush_winter_soldier",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779128544234,
+      "tag": "0007_sticky_shadow_king",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779128986816,
+      "tag": "0008_red_vertigo",
+      "breakpoints": true
     }
   ]
 }

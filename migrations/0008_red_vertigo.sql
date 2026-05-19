@@ -1,0 +1,1 @@
+ALTER TABLE "missions" ADD COLUMN "contact_link" varchar(255);

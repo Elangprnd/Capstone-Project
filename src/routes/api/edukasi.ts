@@ -1,29 +1,25 @@
 import express, { Router } from "express";
+import { 
+  createEdukasiHandler, 
+  updateEdukasiHandler, 
+  deleteEdukasiHandler, 
+  browseEdukasiHandler, 
+  getEdukasiDetailHandler 
+} from "../../controller/edukasi.controller";
+import { authenticate, authorize } from "../../middlewares/authMiddleware";
+import { upload } from "../../middlewares/upload";
+
 const router: Router = express.Router();
 
+// Public browse
+router.get("/", browseEdukasiHandler);
 
-router.get("/me", (req, res) => {
-  res.status(200).json({ message: "get my edukasi uploads endpoint" });
-});
+// Public detail
+router.get("/:id", getEdukasiDetailHandler);
 
-router.get("/", (req, res) => {
-  res.status(200).json({ message: "get all edukasi endpoint" });
-});
-
-router.get("/:id", (req, res) => {
-  res.status(200).json({ message: `get edukasi detail id: ${req.params.id}` });
-});
-
-router.post("/", (req, res) => {
-  res.status(200).json({ message: "upload edukasi endpoint" });
-});
-
-router.put("/:id", (req, res) => {
-  res.status(200).json({ message: `update edukasi id: ${req.params.id}` });
-});
-
-router.delete("/:id", (req, res) => {
-  res.status(200).json({ message: `delete edukasi id: ${req.params.id}` });
-});
+// Volunteer only CRUD
+router.post("/", authenticate, authorize("volunteer"), upload.single("thumbnail"), createEdukasiHandler);
+router.put("/:id", authenticate, authorize("volunteer"), upload.single("thumbnail"), updateEdukasiHandler);
+router.delete("/:id", authenticate, authorize("volunteer"), deleteEdukasiHandler);
 
 export default router;
