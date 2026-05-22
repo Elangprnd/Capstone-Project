@@ -2,7 +2,7 @@
 import { db } from '../config/db'
 import { users, passwordResetTokens } from '../db/schemas'
 import { eq } from 'drizzle-orm'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 import { signToken } from '../config/jwt'
 import crypto from 'crypto'
 import { OAuth2Client } from 'google-auth-library'

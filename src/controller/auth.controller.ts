@@ -67,11 +67,12 @@ export const registerVolunteerHandler = async (req: Request, res: Response): Pro
     })
 
   } catch (error: any) {
+    console.error('--- REGISTER VOLUNTEER ERROR ---');
+    console.error(error);
     if (error.status) {
       res.status(error.status).json({ success: false, message: error.message })
       return
     }
-    console.error('Register error:', error)
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server.' })
   }
 }
