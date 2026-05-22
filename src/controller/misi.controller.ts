@@ -11,8 +11,11 @@ const missionBaseSchema = z.object({
   event_mode: z.enum(["offline", "online"]),
   number_of_volunteers: z.coerce.number().int().positive("Jumlah relawan harus positif"),
   contact_link: z.string().url("Link kontak harus berupa URL valid").optional().or(z.literal("")),
+  coordinator_whatsapp: z.string().optional(),
   start_date: z.string().optional(),
   end_date: z.string().optional(),
+  latitude: z.union([z.number(), z.string(), z.null()]).optional(),
+  longitude: z.union([z.number(), z.string(), z.null()]).optional(),
   image: z.array(z.string().url()).optional(),
 });
 
@@ -28,7 +31,15 @@ const missionSchema = missionBaseSchema.refine(validateDates, {
   path: ["end_date"],
 });
 
-const updateMissionSchema = missionBaseSchema.partial().refine(validateDates, {
+const updateMissionSchema = missionBaseSchema.extend({
+  existing_photos: z.union([
+    z.string(),
+    z.array(z.string())
+  ]).optional().transform(val => {
+    if (!val) return [];
+    return Array.isArray(val) ? val : [val];
+  })
+}).partial().refine(validateDates, {
   message: "end_date tidak boleh lebih awal dari start_date",
   path: ["end_date"],
 });
@@ -84,7 +95,7 @@ export const createMissionHandler = async (req: Request, res: Response) => {
 
     const { 
       title, description, category, location, event_mode, 
-      number_of_volunteers, contact_link, start_date, end_date,
+      number_of_volunteers, contact_link, coordinator_whatsapp, start_date, end_date,
       image
     } = parsedBody.data;
 
@@ -96,6 +107,7 @@ export const createMissionHandler = async (req: Request, res: Response) => {
       event_mode,
       jumlah_relawan: number_of_volunteers,
       contact_link,
+      coordinator_whatsapp,
       startDate: start_date ? new Date(start_date) : undefined,
       endDate: end_date ? new Date(end_date) : undefined,
       foto: image || uploadedImages,
@@ -155,6 +167,14 @@ export const updateMissionHandler = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     
+    // 1. CLEAN BODY: Trim all keys and string values to handle hidden spaces from Postman
+    const cleanBody: any = {};
+    Object.keys(req.body).forEach(key => {
+      const trimmedKey = key.trim();
+      const value = req.body[key];
+      cleanBody[trimmedKey] = typeof value === 'string' ? value.trim() : value;
+    });
+
     // Process files first
     const files = req.files as Express.Multer.File[];
     let uploadedImages: string[] | undefined = undefined;
@@ -164,8 +184,30 @@ export const updateMissionHandler = async (req: Request, res: Response) => {
       uploadedImages = await uploadMultipleToCloudinary(fileBuffers, 'missions');
     }
 
-    const parsedBody = updateMissionSchema.safeParse(req.body);
+    // Defensive check: if category is missing in English, check Indonesian
+    if (!cleanBody.category && cleanBody.kategori) {
+      cleanBody.category = cleanBody.kategori;
+    }
+    if (!cleanBody.title && cleanBody.judul) {
+      cleanBody.title = cleanBody.judul;
+    }
+    if (!cleanBody.description && cleanBody.deskripsi) {
+      cleanBody.description = cleanBody.deskripsi;
+    }
+    if (!cleanBody.location && cleanBody.alamat) {
+      cleanBody.location = cleanBody.alamat;
+    }
+    if (!cleanBody.number_of_volunteers && cleanBody.jumlah_relawan) {
+      cleanBody.number_of_volunteers = cleanBody.jumlah_relawan;
+    }
+
+    console.log('--- UPDATE MISSION DEBUG ---');
+    console.log('Cleaned Body:', JSON.stringify(cleanBody, null, 2));
+
+    const parsedBody = updateMissionSchema.safeParse(cleanBody);
     if (!parsedBody.success) {
+      console.log('--- UPDATE MISSION VALIDATION ERROR ---');
+      console.log('Errors:', JSON.stringify(parsedBody.error.flatten().fieldErrors, null, 2));
       return res.status(400).json({
         error: "VALIDATION_ERROR",
         errors: parsedBody.error.flatten().fieldErrors,
@@ -174,8 +216,9 @@ export const updateMissionHandler = async (req: Request, res: Response) => {
 
     const { 
       title, description, category, location, event_mode, 
-      number_of_volunteers, contact_link, start_date, end_date,
-      image
+      number_of_volunteers, contact_link, coordinator_whatsapp, start_date, end_date,
+      latitude, longitude,
+      image, existing_photos
     } = parsedBody.data;
 
     const missionData: any = {
@@ -186,10 +229,16 @@ export const updateMissionHandler = async (req: Request, res: Response) => {
       ...(event_mode && { event_mode }),
       ...(number_of_volunteers && { jumlah_relawan: number_of_volunteers }),
       ...(contact_link !== undefined && { contact_link }),
+      ...(coordinator_whatsapp !== undefined && { coordinator_whatsapp }),
       ...(start_date && { startDate: new Date(start_date) }),
       ...(end_date && { endDate: new Date(end_date) }),
+      ...(latitude !== undefined && { latitude }),
+      ...(longitude !== undefined && { longitude }),
       ...((image || uploadedImages) && { foto: image || uploadedImages }),
+      existing_photos // Array of photo URLs to keep
     };
+
+    console.log('Mission Data to Service:', JSON.stringify(missionData, null, 2));
 
     await misiService.updateMission(id, missionData);
 

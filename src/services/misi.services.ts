@@ -7,7 +7,7 @@ import { MissionStatusEngine, MissionStatus } from "./misiStatus.services";
 export const createMission = async (data: any, lembagaId: string) => {
   const { 
     judul, deskripsi, kategori, location, jumlah_relawan, 
-    foto, event_mode, contact_link, startDate, endDate 
+    foto, event_mode, contact_link, coordinator_whatsapp, startDate, endDate 
   } = data;
 
   let latitude: string | null = null;
@@ -16,8 +16,8 @@ export const createMission = async (data: any, lembagaId: string) => {
   // Geocoding logic based on event_mode
   if (event_mode === 'offline') {
     const coords = await getCoordinates(location);
-    latitude = coords.latitude.toString();
-    longitude = coords.longitude.toString();
+    latitude = coords.latitude ? coords.latitude.toString() : null;
+    longitude = coords.longitude ? coords.longitude.toString() : null;
   } else if (event_mode === 'online') {
     // Optional geocoding for online, but recommended to skip
     latitude = null;
@@ -46,6 +46,7 @@ export const createMission = async (data: any, lembagaId: string) => {
     startDate,
     endDate,
     contactLink: contact_link,
+    coordinatorWhatsapp: coordinator_whatsapp,
     volunteersNeeded: jumlah_relawan,
     photos: foto,
   };
@@ -213,7 +214,7 @@ export const getMissionsByLembagaId = async (lembagaId: string) => {
 export const updateMission = async (id: string, data: any) => {
   const { 
     judul, deskripsi, kategori, location, jumlah_relawan, 
-    foto, event_mode, contact_link, startDate, endDate 
+    foto, event_mode, contact_link, coordinator_whatsapp, startDate, endDate 
   } = data;
 
   const [existing] = await db.select().from(missions).where(eq(missions.id, id));
@@ -232,8 +233,8 @@ export const updateMission = async (id: string, data: any) => {
   
   if ((locationChanged && currentEventMode === 'offline') || modeChangedToOffline) {
     const coords = await getCoordinates(currentLocation);
-    latitude = coords.latitude.toString();
-    longitude = coords.longitude.toString();
+    latitude = coords.latitude ? coords.latitude.toString() : null;
+    longitude = coords.longitude ? coords.longitude.toString() : null;
   } else if (event_mode === 'online' && existing.eventMode === 'offline') {
     // If changing from offline to online, we can nullify coordinates
     latitude = null;
@@ -247,6 +248,7 @@ export const updateMission = async (id: string, data: any) => {
     "Logistik": "logistik",
   };
 
+  // Update basic info
   const updateData: any = {
     ...(judul && { title: judul }),
     ...(deskripsi && { description: deskripsi }),
@@ -254,22 +256,27 @@ export const updateMission = async (id: string, data: any) => {
     ...(location && { location }),
     ...(event_mode && { eventMode: event_mode }),
     ...(contact_link !== undefined && { contactLink: contact_link }),
+    ...(coordinator_whatsapp !== undefined && { coordinatorWhatsapp: coordinator_whatsapp }),
     ...(startDate && { startDate }),
     ...(endDate && { endDate }),
-    latitude,
-    longitude,
+    // Prioritize passed-in coordinates (e.g. from frontend map/search) over geocoding
+    latitude: data.latitude !== undefined ? data.latitude : latitude,
+    longitude: data.longitude !== undefined ? data.longitude : longitude,
     ...(jumlah_relawan && { volunteersNeeded: jumlah_relawan }),
-    ...(foto && { photos: foto }),
     updatedAt: new Date(),
   };
 
-  const [updated] = await db
-    .update(missions)
-    .set(updateData)
-    .where(eq(missions.id, id))
-    .returning();
+  // Handle photos: Merge kept existing photos with newly uploaded photos
+  const photosToKeep = data.existing_photos || [];
+  const newPhotos = foto || [];
+  const mergedPhotos = [...photosToKeep, ...newPhotos];
 
-  return updated;
+  if (mergedPhotos.length > 0 || (data.existing_photos !== undefined)) {
+    updateData.photos = mergedPhotos;
+  }
+
+  await db.update(missions).set(updateData).where(eq(missions.id, id));
+  return true;
 };
 
 export const updateMissionStatus = async (id: string, nextStatus: MissionStatus, lembagaId: string) => {

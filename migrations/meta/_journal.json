@@ -71,6 +71,13 @@
       "when": 1779215598382,
       "tag": "0009_volatile_vanisher",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779383300005,
+      "tag": "0010_open_lifeguard",
+      "breakpoints": true
     }
   ]
 }
