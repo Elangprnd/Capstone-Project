@@ -31,7 +31,9 @@ app.use(
   "/docs",
   async (req, res, next) => {
     try {
-      const { apiReference } = await import("@scalar/express-api-reference");
+      // Use new Function to prevent TS from transpiling import() to require()
+      const scalarModule = await (new Function('return import("@scalar/express-api-reference")')());
+      const { apiReference } = scalarModule;
       apiReference({
         spec: { url: "/openapi.json" },
         theme: "purple",         
