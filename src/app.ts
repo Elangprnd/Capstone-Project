@@ -1,6 +1,5 @@
 import express from "express";
 import cookieParser from "cookie-parser";
-import { apiReference } from "@scalar/express-api-reference"
 import { openAPISpec } from "./docs/openapi";
 import { corsMiddleware } from "./middlewares/cors";
 import { jsonParser, urlencodedParser } from "./middlewares/json";
@@ -30,15 +29,22 @@ app.get("/openapi.json", (req, res) => {
 
 app.use(
   "/docs",
-  apiReference({
-    spec: { url: "/openapi.json" },
-    theme: "purple",         
-    layout: "modern",        
-    defaultHttpClient: {
-      targetKey: "javascript",
-      clientKey: "fetch",
-    },
-  })
+  async (req, res, next) => {
+    try {
+      const { apiReference } = await import("@scalar/express-api-reference");
+      apiReference({
+        spec: { url: "/openapi.json" },
+        theme: "purple",         
+        layout: "modern",        
+        defaultHttpClient: {
+          targetKey: "javascript",
+          clientKey: "fetch",
+        },
+      })(req, res, next);
+    } catch (error) {
+      next(error);
+    }
+  }
 )
 
 // --- BASE ROUTES ---
