@@ -299,9 +299,24 @@ export const cancelApplication = async (applicationId: string, volunteerId: stri
 export const getMyApplications = async (volunteerId: string) => {
   const result = await pool.query(
     `SELECT 
+      a.id as apply_id,
       a.mission_id as misi_id,
       m.title as judul,
-      a.status
+      m.description as deskripsi,
+      m.category as kategori,
+      m.location as alamat,
+      m.photos as foto,
+      m.event_mode as mode,
+      m.volunteers_needed as jumlah_relawan,
+      m.start_date as tanggal_mulai,
+      m.end_date as tanggal_selesai,
+      m.contact_link as link_lokasi,
+      m.coordinator_whatsapp as link_wa,
+      m.latitude,
+      m.longitude,
+      m.status as mission_status,
+      a.status as apply_status,
+      a.applied_at
     FROM applications a
     JOIN missions m ON a.mission_id = m.id
     WHERE a.volunteer_id = $1
@@ -309,5 +324,44 @@ export const getMyApplications = async (volunteerId: string) => {
     [volunteerId]
   )
 
-  return result.rows
+  const statusMap: Record<string, string> = {
+    "menunggu_relawan": "Open",
+    "sedang_berjalan": "Ongoing",
+    "relawan_terkumpul": "Full",
+    "selesai": "Completed",
+  };
+
+  const applyStatusMap: Record<string, string> = {
+    "pending": "Pending",
+    "approved": "Approve",
+    "rejected": "Reject",
+    "cancelled": "Cancelled"
+  };
+
+  const reverseCategoryMap: Record<string, string> = {
+    "tanggap_bencana": "Bencana Alam",
+    "pendidikan": "Edukasi",
+    "medis": "Kesehatan",
+    "logistik": "Lingkungan", // Adjust mapping based on actual usage, mapping environment temporarily
+  };
+
+  return result.rows.map(r => ({
+    id: r.apply_id,
+    misi_id: r.misi_id,
+    judul: r.judul,
+    deskripsi: r.deskripsi,
+    kategori: reverseCategoryMap[r.kategori] || r.kategori,
+    alamat: r.alamat,
+    foto: r.foto,
+    mode: r.mode === 'online' ? 'Online' : 'Offline',
+    jumlah_relawan: r.jumlah_relawan,
+    tanggal_mulai: r.tanggal_mulai,
+    tanggal_selesai: r.tanggal_selesai,
+    link_lokasi: r.link_lokasi,
+    link_wa: r.link_wa,
+    latitude: r.latitude ? parseFloat(r.latitude) : null,
+    longitude: r.longitude ? parseFloat(r.longitude) : null,
+    status: statusMap[r.mission_status] || r.mission_status,
+    apply_status: applyStatusMap[r.apply_status] || r.apply_status
+  }));
 }
