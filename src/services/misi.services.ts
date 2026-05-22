@@ -116,7 +116,7 @@ export const getAllMissions = async (filters: {
 
   return filtered.map((m) => ({
     id: m.id,
-    title: m.judul || m.title, // Handle both for safety
+    title: m.title, // Handle both for safety
     category: reverseCategoryMap[m.category] || m.category,
     location: m.location,
     latitude: m.latitude ? parseFloat(m.latitude) : null,
