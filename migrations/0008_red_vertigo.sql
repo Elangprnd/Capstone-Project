@@ -1,1 +1,1 @@
-ALTER TABLE "missions" ADD COLUMN "contact_link" varchar(255);
+ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "contact_link" varchar(255);

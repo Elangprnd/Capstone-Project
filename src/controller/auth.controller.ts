@@ -24,9 +24,18 @@ const registerVolunteerSchema = z.object({
 //handler buat ke routes api (req => res)
 export const registerVolunteerHandler = async (req: Request, res: Response): Promise<void> => {
   try {
+    // 0. Clean input
+    const cleanBody: any = {};
+    Object.keys(req.body).forEach(key => {
+      const value = req.body[key];
+      cleanBody[key] = typeof value === 'string' ? value.trim() : value;
+    });
+
     // 1. Validasi input
-    const parsed = registerVolunteerSchema.safeParse(req.body)
+    const parsed = registerVolunteerSchema.safeParse(cleanBody)
     if (!parsed.success) {
+      console.log('--- VOLUNTEER REGISTRATION VALIDATION ERROR ---');
+      console.log('Errors:', JSON.stringify(parsed.error.flatten().fieldErrors, null, 2));
       res.status(400).json({
         success: false,
         message: 'Validasi gagal',
@@ -88,8 +97,17 @@ const registerLembagaSchema = z.object({
 // handler buat ke routes api (req => res)
 export const registerLembagaHandler = async (req: Request, res: Response): Promise<void> => {
   try {
-    const parsed = registerLembagaSchema.safeParse(req.body)
+    // 0. Clean input
+    const cleanBody: any = {};
+    Object.keys(req.body).forEach(key => {
+      const value = req.body[key];
+      cleanBody[key] = typeof value === 'string' ? value.trim() : value;
+    });
+
+    const parsed = registerLembagaSchema.safeParse(cleanBody)
     if (!parsed.success) {
+      console.log('--- LEMBAGA REGISTRATION VALIDATION ERROR ---');
+      console.log('Errors:', JSON.stringify(parsed.error.flatten().fieldErrors, null, 2));
       res.status(400).json({
         success: false,
         message: 'Validasi gagal',

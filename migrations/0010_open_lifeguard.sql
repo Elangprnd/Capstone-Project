@@ -1,0 +1,1 @@
+ALTER TABLE "missions" ALTER COLUMN "coordinator_whatsapp" SET DATA TYPE varchar(255);

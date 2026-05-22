@@ -72,15 +72,15 @@ DO $$ BEGIN
     ALTER TABLE "missions" ALTER COLUMN "created_at" SET NOT NULL;
 END $$;
 --> statement-breakpoint
-ALTER TABLE "applications" ADD COLUMN IF NOT EXISTS "applied_at" timestamp DEFAULT now() NOT NULL;--> statement-breakpoint
-ALTER TABLE "applications" ADD COLUMN IF NOT EXISTS "updated_at" timestamp DEFAULT now() NOT NULL;--> statement-breakpoint
-ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "lembaga_id" uuid NOT NULL;--> statement-breakpoint
-ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "category" "mission_category" NOT NULL;--> statement-breakpoint
-ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "address" text NOT NULL;--> statement-breakpoint
-ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "latitude" numeric(10, 7) NOT NULL;--> statement-breakpoint
-ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "longitude" numeric(10, 7) NOT NULL;--> statement-breakpoint
+ALTER TABLE "applications" ADD COLUMN IF NOT EXISTS "applied_at" timestamp DEFAULT now();--> statement-breakpoint
+ALTER TABLE "applications" ADD COLUMN IF NOT EXISTS "updated_at" timestamp DEFAULT now();--> statement-breakpoint
+ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "lembaga_id" uuid;--> statement-breakpoint
+ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "category" "mission_category";--> statement-breakpoint
+ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "address" text;--> statement-breakpoint
+ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "latitude" numeric(10, 7);--> statement-breakpoint
+ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "longitude" numeric(10, 7);--> statement-breakpoint
 ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "photos" text[];--> statement-breakpoint
-ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "updated_at" timestamp DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "updated_at" timestamp DEFAULT now();--> statement-breakpoint
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'applications_volunteer_id_users_id_fk') THEN
         ALTER TABLE "applications" ADD CONSTRAINT "applications_volunteer_id_users_id_fk" FOREIGN KEY ("volunteer_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;

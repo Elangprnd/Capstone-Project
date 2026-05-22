@@ -53,7 +53,7 @@ export const missions = pgTable('missions', {
   
   // Kontak koordinator lapangan
   // Hanya visible ke relawan yang sudah approved
-  coordinatorWhatsapp: varchar('coordinator_whatsapp', { length: 20 }),
+  coordinatorWhatsapp: varchar('coordinator_whatsapp', { length: 255 }),
   
   status: missionStatusEnum('status').notNull().default('menunggu_relawan'),
   
