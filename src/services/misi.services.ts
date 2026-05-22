@@ -124,6 +124,9 @@ export const getAllMissions = async (filters: {
     event_mode: m.eventMode,
     status: statusMap[m.status] || m.status,
     number_of_volunteers: m.volunteersNeeded,
+    photos: m.photos,
+    start_date: m.startDate,
+    end_date: m.endDate,
   }));
 };
 
