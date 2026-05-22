@@ -1,6 +1,4 @@
 
-import { type OpenApiSpec } from "@scalar/express-api-reference"
-
 export const openAPISpec = {
   openapi: "3.0.3",
   info: {
@@ -958,4 +956,4 @@ export const openAPISpec = {
       },
     },
   },
-} as const satisfies OpenApiSpec
+} as const
