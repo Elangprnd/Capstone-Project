@@ -10,14 +10,28 @@ export interface JwtPayload {
 
 // Helper untuk load keys dari environment dengan handle escape newline
 const getPrivateKey = () => {
-  const key = process.env.JWT_PRIVATE_KEY
+  let key = process.env.JWT_PRIVATE_KEY
   if (!key) throw new Error('JWT_PRIVATE_KEY is not defined in .env')
+  
+  // Remove surrounding quotes if they exist
+  key = key.trim()
+  if (key.startsWith('"') && key.endsWith('"')) {
+    key = key.substring(1, key.length - 1)
+  }
+  
   return key.replace(/\\n/g, '\n')
 }
 
 const getPublicKey = () => {
-  const key = process.env.JWT_PUBLIC_KEY
+  let key = process.env.JWT_PUBLIC_KEY
   if (!key) throw new Error('JWT_PUBLIC_KEY is not defined in .env')
+  
+  // Remove surrounding quotes if they exist
+  key = key.trim()
+  if (key.startsWith('"') && key.endsWith('"')) {
+    key = key.substring(1, key.length - 1)
+  }
+  
   return key.replace(/\\n/g, '\n')
 }
 

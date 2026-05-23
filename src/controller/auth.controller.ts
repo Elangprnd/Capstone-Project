@@ -138,6 +138,8 @@ export const registerLembagaHandler = async (req: Request, res: Response): Promi
     })
 
   } catch (error: any) {
+    console.error('--- REGISTER LEMBAGA ERROR ---');
+    console.error(error);
     if (error.status) {
       res.status(error.status).json({ success: false, message: error.message })
       return
