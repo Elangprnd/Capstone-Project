@@ -46,4 +46,12 @@ router.delete(
   applyController.cancelApplicationHandler
 )
 
+// CAP-80: PATCH /api/apply/:id/material
+router.patch(
+  '/:id/material',
+  authenticate,
+  authorize('volunteer'),
+  applyController.submitMaterialHandler
+)
+
 export default router

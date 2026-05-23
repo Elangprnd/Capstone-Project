@@ -29,8 +29,14 @@ export const createMission = async (data: any, lembagaId: string) => {
 
   // Map kategori to schema enum
   const categoryMap: Record<string, any> = {
-    "Bencana": "tanggap_bencana",
+    "Education": "pendidikan",
+    "Disaster Response": "tanggap_bencana",
+    "Medical": "medis",
+    "Logistics": "logistik",
+    "Psychosocial": "psikososial",
+    "Online Education": "edukasi_online",
     "Pendidikan": "pendidikan",
+    "Bencana": "tanggap_bencana",
     "Medis": "medis",
     "Logistik": "logistik",
   };
@@ -73,13 +79,20 @@ export const getAllMissions = async (filters: {
 
   // Filter by category
   if (kategori) {
-    const categoryMap: Record<string, any> = {
-      "Bencana": "tanggap_bencana",
-      "Pendidikan": "pendidikan",
-      "Medis": "medis",
-      "Logistik": "logistik",
-    };
-    const dbCategory = categoryMap[kategori] || kategori;
+  const categoryMap: Record<string, any> = {
+    "Education": "pendidikan",
+    "Disaster Response": "tanggap_bencana",
+    "Medical": "medis",
+    "Logistics": "logistik",
+    "Psychosocial": "psikososial",
+    "Online Education": "edukasi_online",
+    "Pendidikan": "pendidikan",
+    "Bencana": "tanggap_bencana",
+    "Medis": "medis",
+    "Logistik": "logistik",
+  };
+
+  const dbCategory = categoryMap[kategori] || kategori;
     conditions.push(eq(sql`LOWER(${missions.category})`, dbCategory.toLowerCase()));
   }
 
@@ -104,10 +117,12 @@ export const getAllMissions = async (filters: {
 
   // Map back to response format
   const reverseCategoryMap: Record<string, string> = {
-    "tanggap_bencana": "Bencana",
-    "pendidikan": "Pendidikan",
-    "medis": "Medis",
-    "logistik": "Logistik",
+    "pendidikan": "Education",
+    "tanggap_bencana": "Disaster Response",
+    "medis": "Medical",
+    "logistik": "Logistics",
+    "psikososial": "Psychosocial",
+    "edukasi_online": "Online Education",
   };
 
   const statusMap: Record<string, string> = {
@@ -149,10 +164,12 @@ export const getMissionById = async (id: string) => {
   const approvedCount = parseInt(countResult.rows[0].count);
 
   const reverseCategoryMap: Record<string, string> = {
-    "tanggap_bencana": "Bencana",
-    "pendidikan": "Pendidikan",
-    "medis": "Medis",
-    "logistik": "Logistik",
+    "pendidikan": "Education",
+    "tanggap_bencana": "Disaster Response",
+    "medis": "Medical",
+    "logistik": "Logistics",
+    "psikososial": "Psychosocial",
+    "edukasi_online": "Online Education",
   };
 
   const statusMap: Record<string, string> = {
@@ -212,10 +229,12 @@ export const getMissionsByLembagaId = async (lembagaId: string) => {
   }
 
   const reverseCategoryMap: Record<string, string> = {
-    "tanggap_bencana": "Bencana",
-    "pendidikan": "Pendidikan",
-    "medis": "Medis",
-    "logistik": "Logistik",
+    "pendidikan": "Education",
+    "tanggap_bencana": "Disaster Response",
+    "medis": "Medical",
+    "logistik": "Logistics",
+    "psikososial": "Psychosocial",
+    "edukasi_online": "Online Education",
   };
 
   const statusMap: Record<string, string> = {
@@ -284,15 +303,16 @@ export const updateMission = async (id: string, data: any, authenticatedLembagaI
   }
 
   const categoryMap: Record<string, any> = {
-    "Bencana": "tanggap_bencana",
+    "Education": "pendidikan",
+    "Disaster Response": "tanggap_bencana",
+    "Medical": "medis",
+    "Logistics": "logistik",
+    "Psychosocial": "psikososial",
+    "Online Education": "edukasi_online",
     "Pendidikan": "pendidikan",
+    "Bencana": "tanggap_bencana",
     "Medis": "medis",
     "Logistik": "logistik",
-    "Lainnya": "logistik",
-    "tanggap_bencana": "tanggap_bencana",
-    "pendidikan": "pendidikan",
-    "medis": "medis",
-    "logistik": "logistik",
   };
 
   // Update basic info

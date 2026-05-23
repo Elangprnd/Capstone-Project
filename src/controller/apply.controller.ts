@@ -245,3 +245,44 @@ export const getMyApplicationsHandler = async (req: Request, res: Response): Pro
     res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Terjadi kesalahan server.' })
   }
 }
+
+const materialBodySchema = z.object({
+  video_link: z
+    .string({ message: 'Link video wajib diisi' })
+    .url('Link video harus berupa URL yang valid'),
+})
+
+export const submitMaterialHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const parsedParams = applicationParamSchema.safeParse(req.params)
+    if (!parsedParams.success) {
+      res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        errors: parsedParams.error.flatten().fieldErrors,
+      })
+      return
+    }
+
+    const parsedBody = materialBodySchema.safeParse(req.body)
+    if (!parsedBody.success) {
+      res.status(422).json({
+        error: 'VALIDATION_ERROR',
+        message: 'Input tidak valid',
+        errors: parsedBody.error.flatten().fieldErrors,
+      })
+      return
+    }
+
+    const volunteerId = req.user!.user_id
+    await applyService.submitMaterial(parsedParams.data.id, volunteerId, parsedBody.data.video_link)
+
+    res.status(200).json({ message: 'Material berhasil diupload' })
+  } catch (error: any) {
+    if (error.status) {
+      res.status(error.status).json({ error: error.error, message: error.message })
+      return
+    }
+    console.error('Submit material error:', error)
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Terjadi kesalahan server.' })
+  }
+}

@@ -43,15 +43,6 @@ export const applyMission = async (data: {
       throw { status: 409, error: 'MISSION_CLOSED', message: 'Misi ini sudah tidak menerima pendaftaran.' }
     }
 
-    // Conditional Validation: video_link required if mission is online
-    if (mission.event_mode === 'online' && !data.videoLink) {
-      throw { 
-        status: 422, 
-        error: 'VALIDATION_ERROR', 
-        message: 'Video link wajib diisi untuk misi online.' 
-      }
-    }
-
     // Check if volunteer already applied
     const existing = await client.query(
       `SELECT id, status FROM applications WHERE volunteer_id = $1 AND mission_id = $2`,
@@ -151,7 +142,8 @@ export const getApplicantsByMission = async (missionId: string, lembagaId: strin
       a.domicile,
       a.skills_url,
       a.video_link,
-      a.status
+      a.status,
+      a.updated_at
     FROM applications a
     JOIN users u ON a.volunteer_id = u.id
     WHERE a.mission_id = $1 AND a.status != 'cancelled'
@@ -293,6 +285,29 @@ export const cancelApplication = async (applicationId: string, volunteerId: stri
   return true
 }
 
+export const submitMaterial = async (applicationId: string, volunteerId: string, videoLink: string) => {
+  const [app] = await db.select().from(applications).where(eq(applications.id, applicationId))
+
+  if (!app) {
+    throw { status: 404, error: 'NOT_FOUND', message: 'Data pendaftaran tidak ditemukan.' }
+  }
+
+  // Only the volunteer who created can update
+  if (app.volunteerId !== volunteerId) {
+    throw { status: 403, error: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke pendaftaran ini.' }
+  }
+
+  // Update video link
+  await db.update(applications)
+    .set({ 
+      videoLink, 
+      updatedAt: new Date() 
+    })
+    .where(eq(applications.id, applicationId))
+
+  return true
+}
+
 // ================================================
 // CAP-80: GET /api/apply/me
 // ================================================
@@ -339,10 +354,12 @@ export const getMyApplications = async (volunteerId: string) => {
   };
 
   const reverseCategoryMap: Record<string, string> = {
-    "tanggap_bencana": "Bencana Alam",
-    "pendidikan": "Edukasi",
-    "medis": "Kesehatan",
-    "logistik": "Lingkungan", // Adjust mapping based on actual usage, mapping environment temporarily
+    "pendidikan": "Education",
+    "tanggap_bencana": "Disaster Response",
+    "medis": "Medical",
+    "logistik": "Logistics",
+    "psikososial": "Psychosocial",
+    "edukasi_online": "Online Education",
   };
 
   return result.rows.map(r => ({

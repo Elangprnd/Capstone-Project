@@ -181,6 +181,9 @@ export const loginHandler = async (req: Request, res: Response): Promise<void> =
       success: true,
       message: 'Login berhasil!',
       data: {
+        user_id: user.id,
+        name: user.name,
+        email: user.email,
         role: user.role,
         redirect_url: redirectUrl,
       },
@@ -245,6 +248,9 @@ export const googleAuthHandler = async (req: Request, res: Response): Promise<vo
       success: true,
       message: isNewUser ? 'Akun berhasil dibuat via Google!' : 'Login berhasil!',
       data: {
+        user_id: user.id,
+        name: user.name,
+        email: user.email,
         role: user.role,
         redirect_url: '/',          // langsung direct ke landing page 
       },

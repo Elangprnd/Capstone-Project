@@ -1,24 +1,14 @@
 import express, { Router } from "express";
+import * as userController from "../../controller/user.controller";
+import { authenticate } from "../../middlewares/authMiddleware";
+
 const router: Router = express.Router();
 
-router.get("/me", (req, res) => {
-  res.status(200).json({ message: "get my profile endpoint" });
-});
+// Update user name
+router.patch("/name", authenticate, userController.updateNameHandler);
 
-router.put("/me", (req, res) => {
-  res.status(200).json({ message: "update my profile endpoint" });
-});
-
-router.put("/me/password", (req, res) => {
-  res.status(200).json({ message: "change password endpoint" });
-});
-
-router.put("/relawan/skills", (req, res) => {
-  res.status(200).json({ message: "update relawan skills endpoint" });
-});
-
-router.get("/relawan/:id", (req, res) => {
-  res.status(200).json({ message: `get relawan profile id: ${req.params.id}` });
+router.get("/me", authenticate, (req, res) => {
+  res.status(200).json({ message: "get my profile endpoint", user: req.user });
 });
 
 export default router;
