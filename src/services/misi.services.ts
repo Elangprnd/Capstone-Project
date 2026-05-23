@@ -141,6 +141,13 @@ export const getMissionById = async (id: string) => {
 
   if (!mission) return null;
 
+  // Fetch real-time count of approved volunteers
+  const countResult = await pool.query(
+    `SELECT COUNT(*) as count FROM applications WHERE mission_id = $1 AND status = 'approved'`,
+    [id]
+  );
+  const approvedCount = parseInt(countResult.rows[0].count);
+
   const reverseCategoryMap: Record<string, string> = {
     "tanggap_bencana": "Bencana",
     "pendidikan": "Pendidikan",
@@ -168,7 +175,7 @@ export const getMissionById = async (id: string) => {
     end_date: mission.endDate,
     contact_link: mission.contactLink,
     number_of_volunteers: mission.volunteersNeeded,
-    volunteers_applied: mission.volunteersApplied,
+    volunteers_applied: approvedCount,
     photos: mission.photos,
     status: statusMap[mission.status] || mission.status,
     createdAt: mission.createdAt,
@@ -182,20 +189,25 @@ export const getMissionsByLembagaId = async (lembagaId: string) => {
     .from(missions)
     .where(and(eq(missions.lembagaId, lembagaId), isNull(missions.deletedAt)));
 
-  // Fetch pending applicants count for each mission
+  // Fetch application counts for each mission directly from applications table
   const missionIds = allMissions.map(m => m.id);
   let pendingCounts: Record<string, number> = {};
+  let approvedCounts: Record<string, number> = {};
 
   if (missionIds.length > 0) {
     const countsResult = await pool.query(
-      `SELECT mission_id, COUNT(*) as count 
+      `SELECT mission_id, status, COUNT(*) as count 
        FROM applications 
-       WHERE mission_id = ANY($1) AND status = 'pending'
-       GROUP BY mission_id`,
+       WHERE mission_id = ANY($1) AND status IN ('pending', 'approved')
+       GROUP BY mission_id, status`,
       [missionIds]
     );
     countsResult.rows.forEach(row => {
-      pendingCounts[row.mission_id] = parseInt(row.count);
+      if (row.status === 'pending') {
+        pendingCounts[row.mission_id] = parseInt(row.count);
+      } else if (row.status === 'approved') {
+        approvedCounts[row.mission_id] = parseInt(row.count);
+      }
     });
   }
 
@@ -226,7 +238,8 @@ export const getMissionsByLembagaId = async (lembagaId: string) => {
     end_date: m.endDate,
     contact_link: m.contactLink,
     number_of_volunteers: m.volunteersNeeded,
-    volunteers_applied: m.volunteersApplied,
+    // Use the count directly from the applications table for accuracy
+    volunteers_applied: approvedCounts[m.id] || 0,
     pending_applicants_count: pendingCounts[m.id] || 0,
     photos: m.photos,
     status: statusMap[m.status] || m.status,
@@ -235,7 +248,7 @@ export const getMissionsByLembagaId = async (lembagaId: string) => {
   }));
 };
 
-export const updateMission = async (id: string, data: any) => {
+export const updateMission = async (id: string, data: any, authenticatedLembagaId?: string) => {
   const { 
     judul, deskripsi, kategori, location, jumlah_relawan, 
     foto, event_mode, contact_link, coordinator_whatsapp, startDate, endDate 
@@ -243,6 +256,11 @@ export const updateMission = async (id: string, data: any) => {
 
   const [existing] = await db.select().from(missions).where(eq(missions.id, id));
   if (!existing) throw new Error("MISI_TIDAK_DITEMUKAN");
+
+  // Security: Verify ownership if authenticatedLembagaId is provided
+  if (authenticatedLembagaId && existing.lembagaId !== authenticatedLembagaId) {
+    throw new Error("TIDAK_DIIZINKAN");
+  }
 
   let latitude = existing.latitude;
   let longitude = existing.longitude;
@@ -270,13 +288,18 @@ export const updateMission = async (id: string, data: any) => {
     "Pendidikan": "pendidikan",
     "Medis": "medis",
     "Logistik": "logistik",
+    "Lainnya": "logistik",
+    "tanggap_bencana": "tanggap_bencana",
+    "pendidikan": "pendidikan",
+    "medis": "medis",
+    "logistik": "logistik",
   };
 
   // Update basic info
   const updateData: any = {
     ...(judul && { title: judul }),
     ...(deskripsi && { description: deskripsi }),
-    ...(kategori && { category: categoryMap[kategori] || kategori }),
+    ...(kategori && { category: categoryMap[kategori] || "logistik" }),
     ...(location && { location }),
     ...(event_mode && { eventMode: event_mode }),
     ...(contact_link !== undefined && { contactLink: contact_link }),
