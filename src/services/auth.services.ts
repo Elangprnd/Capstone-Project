@@ -75,18 +75,22 @@ export const registerLembaga = async (data: {
   email: string
   password: string
 }) => {
+  console.log('--- START registerLembaga ---');
   // Cek email sudah terdaftar
   const existingUser = await db.query.users.findFirst({
     where: eq(users.email, data.email),
   })
 
   if (existingUser) {
+    console.log('Email already exists:', data.email);
     throw { status: 409, message: 'Email sudah terdaftar. Silakan login.' }
   }
   // Hash password
+  console.log('Hashing password...');
   const passwordHash = await bcrypt.hash(data.password, BCRYPT_COST)
 
   // Insert ke database dengan transaction
+  console.log('Inserting user into DB...');
   const newUser = await db.transaction(async (tx) => {
     const [created] = await tx.insert(users).values({
       name: data.name,
@@ -99,12 +103,19 @@ export const registerLembaga = async (data: {
     return created
   })
 
+  if (!newUser) {
+    console.error('Failed to create user in DB');
+    throw new Error('Gagal membuat akun di database.')
+  }
+
+  console.log('Signing token for user:', newUser.id);
   const token = signToken({
     user_id: newUser.id,
     role: newUser.role,
     auth_provider: newUser.authProvider,
   })
 
+  console.log('--- END registerLembaga ---');
   return { token, user: newUser }
 }
 
