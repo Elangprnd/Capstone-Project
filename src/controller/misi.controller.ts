@@ -240,12 +240,16 @@ export const updateMissionHandler = async (req: Request, res: Response) => {
 
     console.log('Mission Data to Service:', JSON.stringify(missionData, null, 2));
 
-    await misiService.updateMission(id, missionData);
+    const lembagaId = req.user!.user_id;
+    await misiService.updateMission(id, missionData, lembagaId);
 
     res.status(200).json({ message: "Misi berhasil diperbarui" });
   } catch (error: any) {
     if (error.message === "MISI_TIDAK_DITEMUKAN") {
       return res.status(404).json({ error: "Misi tidak ditemukan" });
+    }
+    if (error.message === "TIDAK_DIIZINKAN") {
+      return res.status(403).json({ error: "Anda tidak memiliki akses untuk memperbarui misi ini" });
     }
     if (error.message === "LOKASI_TIDAK_VALID") {
       return res.status(400).json({ error: "Lokasi tidak valid" });
