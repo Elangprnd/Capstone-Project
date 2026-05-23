@@ -1,8 +1,11 @@
 import { db } from "../config/db";
+import pool from "../config/db";
 import { missions, Mission, NewMission } from "../db/schemas/missions.schema";
+import { applications } from "../db/schemas/applications.schema";
 import { eq, and, isNull, sql, inArray } from "drizzle-orm";
 import { getCoordinates } from "./geocoding.services";
 import { MissionStatusEngine, MissionStatus } from "./misiStatus.services";
+import { deleteFromCloudinary } from "./upload.services";
 
 export const createMission = async (data: any, lembagaId: string) => {
   const { 
@@ -179,6 +182,23 @@ export const getMissionsByLembagaId = async (lembagaId: string) => {
     .from(missions)
     .where(and(eq(missions.lembagaId, lembagaId), isNull(missions.deletedAt)));
 
+  // Fetch pending applicants count for each mission
+  const missionIds = allMissions.map(m => m.id);
+  let pendingCounts: Record<string, number> = {};
+
+  if (missionIds.length > 0) {
+    const countsResult = await pool.query(
+      `SELECT mission_id, COUNT(*) as count 
+       FROM applications 
+       WHERE mission_id = ANY($1) AND status = 'pending'
+       GROUP BY mission_id`,
+      [missionIds]
+    );
+    countsResult.rows.forEach(row => {
+      pendingCounts[row.mission_id] = parseInt(row.count);
+    });
+  }
+
   const reverseCategoryMap: Record<string, string> = {
     "tanggap_bencana": "Bencana",
     "pendidikan": "Pendidikan",
@@ -207,6 +227,7 @@ export const getMissionsByLembagaId = async (lembagaId: string) => {
     contact_link: m.contactLink,
     number_of_volunteers: m.volunteersNeeded,
     volunteers_applied: m.volunteersApplied,
+    pending_applicants_count: pendingCounts[m.id] || 0,
     photos: m.photos,
     status: statusMap[m.status] || m.status,
     createdAt: m.createdAt,
@@ -290,10 +311,32 @@ export const deleteMission = async (id: string) => {
   const [existing] = await db.select().from(missions).where(eq(missions.id, id));
   if (!existing) throw new Error("MISI_TIDAK_DITEMUKAN");
 
-  await db
-    .update(missions)
-    .set({ deletedAt: new Date() })
-    .where(eq(missions.id, id));
+  // 1. Delete images from Cloudinary if any
+  if (existing.photos && existing.photos.length > 0) {
+    for (const photoUrl of existing.photos) {
+      try {
+        const parts = photoUrl.split('/');
+        const uploadIndex = parts.indexOf('upload');
+        if (uploadIndex !== -1 && parts.length > uploadIndex + 2) {
+          const publicIdParts = parts.slice(uploadIndex + 2);
+          const publicIdWithExtension = publicIdParts.join('/');
+          const publicId = publicIdWithExtension.split('.')[0];
+          await deleteFromCloudinary(publicId);
+        } else {
+          const fileName = parts[parts.length - 1].split('.')[0];
+          await deleteFromCloudinary(fileName);
+        }
+      } catch (err) {
+        console.error(`Failed to delete image ${photoUrl} from Cloudinary:`, err);
+      }
+    }
+  }
+
+  // 2. Delete all members (applications)
+  await db.delete(applications).where(eq(applications.missionId, id));
+
+  // 3. Hard delete the mission
+  await db.delete(missions).where(eq(missions.id, id));
   
   return true;
 };
