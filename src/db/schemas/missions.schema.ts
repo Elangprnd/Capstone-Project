@@ -19,6 +19,8 @@ export const missionCategoryEnum = pgEnum('mission_category', [
   'tanggap_bencana',
   'medis',
   'logistik',
+  'psikososial',
+  'edukasi_online',
 ])
 
 export const eventModeEnum = pgEnum('event_mode', ['offline', 'online'])
