@@ -68,4 +68,20 @@ app.use("/api/apply", applyRouter);
 app.use("/api/edukasi", edukasiRouter);
 app.use("/api/admin", adminRouter);
 
+// --- GLOBAL ERROR HANDLER ---
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('--- UNHANDLED ERROR ---');
+  console.error('Message:', err.message);
+  console.error('Stack:', err.stack);
+  
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Terjadi kesalahan server internal.',
+    debug: process.env.NODE_ENV !== 'production' ? {
+      message: err.message,
+      stack: err.stack
+    } : undefined
+  });
+});
+
 export default app;

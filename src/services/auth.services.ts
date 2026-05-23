@@ -91,29 +91,43 @@ export const registerLembaga = async (data: {
 
   // Insert ke database dengan transaction
   console.log('Inserting user into DB...');
-  const newUser = await db.transaction(async (tx) => {
-    const [created] = await tx.insert(users).values({
-      name: data.name,
-      email: data.email,
-      passwordHash,
-      role: 'lembaga',                  // Perbedaan utama dari register relawan
-      authProvider: 'email',
-      isProfileComplete: false,
-    }).returning()
-    return created
-  })
+  let newUser;
+  try {
+    newUser = await db.transaction(async (tx) => {
+      const results = await tx.insert(users).values({
+        name: data.name,
+        email: data.email,
+        passwordHash,
+        role: 'lembaga',                  // Perbedaan utama dari register relawan
+        authProvider: 'email',
+        isProfileComplete: false,
+      }).returning();
+      
+      console.log('DB Insert results length:', results.length);
+      return results[0];
+    })
+  } catch (dbError: any) {
+    console.error('Database Transaction Error:', dbError.message);
+    throw { status: 500, message: `Database error: ${dbError.message}` };
+  }
 
   if (!newUser) {
-    console.error('Failed to create user in DB');
+    console.error('Failed to create user in DB: newUser is null or undefined');
     throw new Error('Gagal membuat akun di database.')
   }
 
   console.log('Signing token for user:', newUser.id);
-  const token = signToken({
-    user_id: newUser.id,
-    role: newUser.role,
-    auth_provider: newUser.authProvider,
-  })
+  let token;
+  try {
+    token = signToken({
+      user_id: newUser.id,
+      role: newUser.role,
+      auth_provider: newUser.authProvider,
+    })
+  } catch (jwtError: any) {
+    console.error('JWT Signing Error:', jwtError.message);
+    throw { status: 500, message: `Auth error: ${jwtError.message}` };
+  }
 
   console.log('--- END registerLembaga ---');
   return { token, user: newUser }
