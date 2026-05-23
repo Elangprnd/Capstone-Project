@@ -319,7 +319,7 @@ export const getMyApplications = async (volunteerId: string) => {
       a.applied_at
     FROM applications a
     JOIN missions m ON a.mission_id = m.id
-    WHERE a.volunteer_id = $1
+    WHERE a.volunteer_id = $1 AND m.deleted_at IS NULL
     ORDER BY a.applied_at DESC`,
     [volunteerId]
   )
